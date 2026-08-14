@@ -1,12 +1,12 @@
 {
   "id": "item_randomizer",
   "name": "Item Randomizer",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "entry": "main.lua",
   "api": 2,
   "category": "GAMEPLAY",
   "profile": "content",
   "games": ["gen1"],
   "affects_link": false,
-  "description": "Safe non-key-item randomization for overworld and Itemfinder pickups, progression-weighted loot, and a protected New Game PC reroll."
+  "description": "Safe non-key-item randomization for overworld and Itemfinder pickups, progression-weighted loot, and a reliable protected New Game PC reroll."
 }
