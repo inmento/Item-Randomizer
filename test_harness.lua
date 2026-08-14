@@ -1,0 +1,100 @@
+local callbacks = { events = {}, hooks = {} }
+local store = {}
+local optionValues = {
+  lesser_bad_items = true,
+  progression_weighted_loot = true,
+  overworld_items = true,
+  itemfinder_items = true,
+  starting_pc_item = true,
+  reroll_pc_item = false,
+}
+
+-- Deterministic highest-ticket selection: the test checks safety and state
+-- transitions rather than probability distribution.
+love = { math = { random = function(n) return n end } }
+
+local maps = {
+  VIRIDIAN_FOREST = {
+    objects = {
+      { index = 1, item = "POTION" },
+      { index = 2, item = "BICYCLE" },
+      { index = 3, item = "HM_01" },
+    },
+  },
+}
+local hiddenItems = {
+  VIRIDIAN_FOREST = { { x = 2, y = 3, item = "ANTIDOTE" } },
+}
+local itemRecords = {
+  POTION = { price = 300, tossable = true },
+  ANTIDOTE = { price = 100, tossable = true },
+  SUPER_POTION = { price = 700, tossable = true },
+  RARE_CANDY = { price = 4800, tossable = true },
+  BICYCLE = { keyItem = true, tossable = false },
+  HM_01 = { machine = { kind = "HM", number = 1 }, tossable = false },
+}
+
+local mod = {
+  id = "item_randomizer",
+  content = {
+    maps = { each = function() return pairs(maps) end },
+    field = { get = function(_, key) if key == "hiddenItems" then return hiddenItems end end },
+    items = { each = function() return pairs(itemRecords) end },
+  },
+  options = {
+    define = function(_, schema) callbacks.schema = schema end,
+    get = function(_, key) return optionValues[key] end,
+  },
+  save = {
+    get = function(_, key) return store[key] end,
+    set = function(_, key, value) store[key] = value end,
+  },
+  hooks = { wrap = function(_, name, fn) callbacks.hooks[name] = fn end },
+  events = { on = function(_, name, fn) callbacks.events[name] = fn end },
+  log = { info = function() end, warn = function() end },
+}
+
+local entry = assert(loadfile("/home/ubuntu/item_randomizer/main.lua"))
+entry()(mod)
+assert(#callbacks.schema == 6, "six safe-weighted randomizer options were not defined")
+
+local save = { pcItems = { POTION = 1 }, modData = {}, inventory = {} }
+callbacks.hooks["save.new_game"](function(s) return s end, save)
+local game = { save = save, data = { maps = maps, field = { hiddenItems = hiddenItems } } }
+mod.game = game
+callbacks.events["game.ready"]({ game = game })
+
+local mapping = store.item_mapping
+assert(mapping and mapping.version == 3 and mapping.placements, "v3 mapping was not stored")
+for _, itemId in pairs(mapping.placements) do
+  assert(itemId ~= "BICYCLE" and itemId ~= "HM_01", "unsafe key/HM item entered a generated placement")
+end
+assert(maps.VIRIDIAN_FOREST.objects[2].item == "BICYCLE", "key-item source was changed")
+assert(maps.VIRIDIAN_FOREST.objects[3].item == "HM_01", "HM source was changed")
+assert(next(save.pcItems) ~= nil, "New Game PC item was not initialized")
+
+local oldPcItem = mapping.placements["pc:new_game"]
+callbacks.events["mod.options_changed"]({
+  mod = "item_randomizer", key = "reroll_pc_item", value = true,
+})
+mapping = store.item_mapping
+local newPcItem = mapping.placements["pc:new_game"]
+assert(mapping.pcRerolls == 1, "PC reroll count was not saved")
+assert(save.pcItems[newPcItem] == 1, "PC reroll did not replace the generated starting item")
+assert(newPcItem ~= "BICYCLE" and newPcItem ~= "HM_01", "PC reroll produced an unsafe item")
+
+-- Withdrawing the generated item locks rerolls when the PC screen closes.
+save.pcItems[newPcItem] = nil
+callbacks.events["screen.popped"]({ state = { kind = "pc_item_withdraw" } })
+mapping = store.item_mapping
+assert(mapping.pcRerollLocked == true, "withdrawing the starting item did not permanently lock rerolls")
+
+-- Depositing the item back later cannot reopen the feature.
+save.pcItems[newPcItem] = 1
+callbacks.events["mod.options_changed"]({
+  mod = "item_randomizer", key = "reroll_pc_item", value = true,
+})
+assert(mapping.pcRerolls == 1, "permanently locked PC reroll was re-enabled")
+assert(save.pcItems[newPcItem] == 1, "locked PC reroll modified the re-deposited item")
+
+print("item randomizer safety, weighting, and permanent PC reroll lock harness: valid")
