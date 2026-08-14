@@ -1,6 +1,10 @@
 # Item Randomizer
 
-Item Randomizer creates a **persistent per-save mapping** for visible overworld item balls, hidden Itemfinder discoveries, and optionally the one item in the player’s PC on a New Game. This first public release keeps the generated pools progression-safe: key items, HMs, non-tossable items, and their original sources remain vanilla.
+Item Randomizer creates a **persistent per-save mapping** for visible overworld item balls, hidden Itemfinder discoveries, and optionally the one item in the player’s PC on a New Game. The generated pools remain progression-safe: key items, HMs, non-tossable items, and their original sources remain vanilla.
+
+## Version 0.0.2
+
+This focused maintenance update corrects the New Game PC reroll action. It retains the latest confirmed active save during option-menu transitions, so the reroll can reliably update the live PC item. A successful reroll now also guarantees a **different** safe item rather than appearing to do nothing when the random draw repeats the current item. The protected withdrawal lock and all other randomization behavior are unchanged.
 
 ## Options
 
@@ -37,7 +41,7 @@ If the mod is first enabled on an existing save, it creates safe placements for 
 
 ## Install
 
-Import `item_randomizer-0.0.1.zip` using Gen 1 Recomp’s **Import mod .zip** action. Alternatively, extract it so the final structure is exactly:
+Import `item_randomizer-0.0.2.zip` using Gen 1 Recomp’s **Import mod .zip** action. Alternatively, extract it so the final structure is exactly:
 
 ```text
 mods/
@@ -55,4 +59,4 @@ This mod changes item placement data at runtime. It is independent of Gym Leader
 
 ## Verification status
 
-The manifest has been checked as valid JSON, `main.lua` has passed offline Lua syntax validation, and an isolated harness verifies key/HM exclusion, protected PC reroll persistence, permanent withdrawal locking, and mapping projection. It has not been run against a player-imported game in this environment.
+The manifest has been checked as valid JSON, `main.lua` has passed offline Lua syntax validation, and an isolated harness verifies key/HM exclusion, reliable live-save PC rerolling, guaranteed changed reroll results, permanent withdrawal locking, and mapping projection. It has not been run against a player-imported game in this environment.
