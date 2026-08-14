@@ -10,6 +10,22 @@ return function(mod)
   local MOD_STATE_KEY = "item_mapping"
   local MAPPING_VERSION = 3
 
+  -- `mod.game` resolves the engine singleton in a live boot, but keeping the
+  -- most recent lifecycle payload makes an option action reliable during UI
+  -- transitions as well. The reference is never saved; only the mapping is.
+  local activeGame = nil
+
+  local function rememberActiveGame(game)
+    if game and game.save then activeGame = game end
+    return activeGame
+  end
+
+  local function liveGame()
+    local game = mod.game
+    if game and game.save then return rememberActiveGame(game) end
+    return activeGame
+  end
+
   local LOW_VALUE_ITEMS = {
     ANTIDOTE = true, AWAKENING = true, BURN_HEAL = true, BRN_HEAL = true,
     ESCAPE_ROPE = true, GUARD_SPEC = true, ICE_HEAL = true,
@@ -430,7 +446,7 @@ return function(mod)
   local function lockPcRerollAfterWithdrawal()
     local mapping = mod.save:get(MOD_STATE_KEY)
     local source = SOURCE_BY_KEY["pc:new_game"]
-    local game = mod.game
+    local game = liveGame()
     if not (validMapping(mapping) and source and game and game.save)
       or mapping.pcRerollLocked then
       return false
@@ -450,7 +466,7 @@ return function(mod)
   -- starting item while the PC still contains exactly that one generated copy.
   -- A withdrawal permanently locks the feature for this save.
   local function rerollNewGamePc()
-    local game = mod.game
+    local game = liveGame()
     local mapping = ensureMapping()
     local source = SOURCE_BY_KEY["pc:new_game"]
     if lockPcRerollAfterWithdrawal() or mapping.pcRerollLocked then
@@ -467,9 +483,28 @@ return function(mod)
       return false
     end
 
-    local replacement = itemForSource(source, mapping.options)
+    -- A reroll must visibly change the PC item. Repeating a random result is
+    -- technically possible, but feels broken and can make the action appear to
+    -- do nothing. Retry the normal pool first, then choose another safe record
+    -- deterministically if an unlucky or mocked RNG keeps returning oldItem.
+    local replacement = nil
+    for _ = 1, 24 do
+      local candidate = itemForSource(source, mapping.options)
+      if candidate and candidate ~= oldItem then
+        replacement = candidate
+        break
+      end
+    end
     if not replacement then
-      mod.log:warn("PC reroll failed: no safe random item is available")
+      for _, candidate in ipairs(SAFE_ITEMS) do
+        if candidate ~= oldItem then
+          replacement = candidate
+          break
+        end
+      end
+    end
+    if not replacement then
+      mod.log:warn("PC reroll failed: no different safe item is available")
       return false
     end
     mapping.placements[source.key] = replacement
@@ -488,6 +523,7 @@ return function(mod)
   end)
 
   local function activateCurrentSave(game)
+    game = rememberActiveGame(game)
     local mapping = ensureMapping()
     local applied = applyMapping(game, mapping)
     mod.log:info("Applied safe item mapping to %d selected visible/hidden sources", applied)
@@ -497,10 +533,10 @@ return function(mod)
     activateCurrentSave(event.game)
   end)
   mod.events:on("save.created", function(event)
-    activateCurrentSave(mod.game or event.game)
+    activateCurrentSave(event.game or mod.game)
   end)
   mod.events:on("save.loaded", function(event)
-    activateCurrentSave(mod.game or event.game)
+    activateCurrentSave(event.game or mod.game)
   end)
 
   -- Player PC withdrawal removes the item before its menu/quantity state
