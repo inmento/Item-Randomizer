@@ -74,12 +74,16 @@ assert(maps.VIRIDIAN_FOREST.objects[3].item == "HM_01", "HM source was changed")
 assert(next(save.pcItems) ~= nil, "New Game PC item was not initialized")
 
 local oldPcItem = mapping.placements["pc:new_game"]
+-- The mod API resolves mod.game lazily. A transient nil during the options
+-- transition must not prevent the reroll from using the last game.ready save.
+mod.game = nil
 callbacks.events["mod.options_changed"]({
   mod = "item_randomizer", key = "reroll_pc_item", value = true,
 })
 mapping = store.item_mapping
 local newPcItem = mapping.placements["pc:new_game"]
 assert(mapping.pcRerolls == 1, "PC reroll count was not saved")
+assert(newPcItem ~= oldPcItem, "PC reroll returned the same item and appeared to do nothing")
 assert(save.pcItems[newPcItem] == 1, "PC reroll did not replace the generated starting item")
 assert(newPcItem ~= "BICYCLE" and newPcItem ~= "HM_01", "PC reroll produced an unsafe item")
 
