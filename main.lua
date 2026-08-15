@@ -8,7 +8,12 @@
 
 return function(mod)
   local MOD_STATE_KEY = "item_mapping"
-  local MAPPING_VERSION = 3
+  local MAPPING_VERSION = 4
+
+  local function isGen2(game)
+    game = game or mod.game
+    return game and game.data and game.data.gen2Maps ~= nil
+  end
 
   -- `mod.game` resolves the engine singleton in a live boot, but keeping the
   -- most recent lifecycle payload makes an option action reliable during UI
@@ -41,7 +46,21 @@ return function(mod)
     RARE_CANDY = true, ULTRA_BALL = true,
   }
 
+  -- Gold map/script data stores item IDs as numeric ROM indices. Convert those
+  -- to the same string IDs the content registry uses before persisting a map.
+  local ITEM_INFO, ITEM_ID_BY_INDEX = {}, {}
+  for itemId, item in mod.content.items:each() do
+    ITEM_INFO[itemId] = item
+    if item and item.index ~= nil then ITEM_ID_BY_INDEX[item.index] = itemId end
+  end
+
+  local function canonicalItemId(itemId)
+    if type(itemId) == "number" then return ITEM_ID_BY_INDEX[itemId] end
+    return itemId
+  end
+
   local function isRealItem(itemId)
+    itemId = canonicalItemId(itemId)
     return type(itemId) == "string"
       and itemId ~= ""
       and itemId ~= "0"
@@ -89,6 +108,18 @@ return function(mod)
       type = "toggle",
       default = false,
     },
+    {
+      key = "randomize_held_items",
+      label = "RANDOMIZE HELD ITEMS (GOLD)",
+      type = "toggle",
+      default = true,
+    },
+    {
+      key = "randomize_overworld_berries",
+      label = "RANDOMIZE BERRY TREES (GOLD)",
+      type = "toggle",
+      default = true,
+    },
   })
 
   local function optionSnapshot()
@@ -98,6 +129,8 @@ return function(mod)
       overworld_items = mod.options:get("overworld_items") and true or false,
       itemfinder_items = mod.options:get("itemfinder_items") and true or false,
       starting_pc_item = mod.options:get("starting_pc_item") and true or false,
+      randomize_held_items = mod.options:get("randomize_held_items") and true or false,
+      randomize_overworld_berries = mod.options:get("randomize_overworld_berries") and true or false,
     }
   end
 
@@ -108,6 +141,8 @@ return function(mod)
       overworld_items = options.overworld_items and true or false,
       itemfinder_items = options.itemfinder_items and true or false,
       starting_pc_item = options.starting_pc_item and true or false,
+      randomize_held_items = options.randomize_held_items and true or false,
+      randomize_overworld_berries = options.randomize_overworld_berries and true or false,
     }
   end
 
@@ -118,7 +153,17 @@ return function(mod)
       and a.overworld_items == b.overworld_items
       and a.itemfinder_items == b.itemfinder_items
       and a.starting_pc_item == b.starting_pc_item
+      and a.randomize_held_items == b.randomize_held_items
+      and a.randomize_overworld_berries == b.randomize_overworld_berries
   end
+
+  -- Gold fruit-tree IDs that produce berries rather than apricorns. The VM
+  -- treats tree ID as data, so remapping one berry tree to another existing
+  -- berry tree keeps daily-reset and picked-flag behavior intact.
+  local GOLD_BERRY_TREE_IDS = {
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+    24, 25, 26, 27, 28, 29, 30,
+  }
 
   -- Collect the exact source locations from merged content. Another content
   -- mod's ordinary item balls and hidden items join this list automatically.
@@ -131,13 +176,14 @@ return function(mod)
           sources[#sources + 1] = {
             key = "visible:" .. mapId .. ":" .. tostring(objectIndex),
             kind = "visible", mapId = mapId, objectIndex = objectIndex,
-            original = object.item,
+            original = canonicalItemId(object.item),
           }
         end
       end
     end
 
-    local hiddenItems = mod.content.field:get("hiddenItems") or {}
+    local hiddenItems = (not isGen2() and mod.content.field
+      and mod.content.field:get("hiddenItems")) or {}
     for mapId, entries in pairs(hiddenItems) do
       for hiddenIndex, entry in ipairs(entries or {}) do
         if isRealItem(entry.item) then
@@ -145,9 +191,18 @@ return function(mod)
             key = "hidden:" .. mapId .. ":" .. tostring(entry.x)
               .. ":" .. tostring(entry.y) .. ":" .. tostring(hiddenIndex),
             kind = "hidden", mapId = mapId, hiddenIndex = hiddenIndex,
-            x = entry.x, y = entry.y, original = entry.item,
+            x = entry.x, y = entry.y, original = canonicalItemId(entry.item),
           }
         end
+      end
+    end
+
+    if isGen2() then
+      for _, treeId in ipairs(GOLD_BERRY_TREE_IDS) do
+        sources[#sources + 1] = {
+          key = "berry_tree:" .. tostring(treeId), kind = "berry_tree",
+          treeId = treeId, original = treeId,
+        }
       end
     end
 
@@ -164,17 +219,15 @@ return function(mod)
   local SOURCE_BY_KEY = {}
   for _, source in ipairs(SOURCES) do SOURCE_BY_KEY[source.key] = source end
 
-  local ITEM_INFO = {}
-  for itemId, item in mod.content.items:each() do ITEM_INFO[itemId] = item end
-
   -- Key items, HMs, and non-tossable records are progression-critical or
   -- otherwise unsuitable as random rewards. Keep their original sources and
   -- exclude them from every generated item pool.
   local function isUnsafeProgressionItem(itemId)
     local item = ITEM_INFO[itemId]
     if not item then return true end
-    if item.keyItem or item.tossable == false then return true end
-    if itemId:match("^HM_") then return true end
+    if item.keyItem or item.tossable == false or item.canToss == false
+      or item.pocket == "KEY_ITEM" then return true end
+    if itemId:match("^HM_" ) or itemId:match("^HM%d") then return true end
     if type(item.machine) == "table" and item.machine.kind == "HM" then return true end
     return false
   end
@@ -187,10 +240,27 @@ return function(mod)
   end
   table.sort(SAFE_ITEMS)
 
+  local SAFE_HELD_ITEMS = {}
+  for _, itemId in ipairs(SAFE_ITEMS) do
+    local item = ITEM_INFO[itemId] or {}
+    if item.heldEffect and item.heldEffect ~= "HELD_NONE" then
+      SAFE_HELD_ITEMS[#SAFE_HELD_ITEMS + 1] = itemId
+    end
+  end
+
+  local function itemValueForGame(game, itemId)
+    if isGen2(game) then
+      local item = ITEM_INFO[itemId]
+      return item and item.index or nil
+    end
+    return itemId
+  end
+
   local function sourceEnabled(source, options)
     if source.kind == "visible" then return options.overworld_items end
     if source.kind == "hidden" then return options.itemfinder_items end
     if source.kind == "pc" then return options.starting_pc_item end
+    if source.kind == "berry_tree" then return options.randomize_overworld_berries end
     return false
   end
 
@@ -200,7 +270,7 @@ return function(mod)
     local selected = {}
     for _, source in ipairs(SOURCES) do
       if sourceEnabled(source, options)
-        and not isUnsafeProgressionItem(source.original) then
+        and (source.kind == "berry_tree" or not isUnsafeProgressionItem(source.original)) then
         selected[#selected + 1] = source
       end
     end
@@ -298,19 +368,35 @@ return function(mod)
   local function makeMapping(options)
     local selected = selectedSources(options)
     local placements = {}
+    local itemSources, berrySources = {}, {}
+    for _, source in ipairs(selected) do
+      if source.kind == "berry_tree" then
+        berrySources[#berrySources + 1] = source
+      else
+        itemSources[#itemSources + 1] = source
+      end
+    end
 
     if options.progression_weighted_loot then
-      for _, source in ipairs(selected) do
+      for _, source in ipairs(itemSources) do
         placements[source.key] = itemForSource(source, options)
       end
     else
       -- Non-weighted mode preserves the original source-item permutation,
       -- excluding only unsafe progression items and their source locations.
       local items = {}
-      for i, source in ipairs(selected) do items[i] = source.original end
+      for i, source in ipairs(itemSources) do items[i] = source.original end
       shuffle(items)
-      for i, source in ipairs(selected) do placements[source.key] = items[i] end
+      for i, source in ipairs(itemSources) do placements[source.key] = items[i] end
     end
+
+    -- A fruit tree opcode consumes a tree ID rather than an item ID. Shuffle
+    -- only among the existing berry-tree IDs, preserving Gold's fruit-tree
+    -- daily reset flags and never redirecting an apricorn tree.
+    local treeIds = {}
+    for i, source in ipairs(berrySources) do treeIds[i] = source.treeId end
+    shuffle(treeIds)
+    for i, source in ipairs(berrySources) do placements[source.key] = treeIds[i] end
 
     return {
       version = MAPPING_VERSION,
@@ -328,7 +414,9 @@ return function(mod)
     end
     for _, source in ipairs(selectedSources(mapping.options)) do
       local itemId = mapping.placements[source.key]
-      if not isRealItem(itemId) or isUnsafeProgressionItem(itemId) then
+      if source.kind == "berry_tree" then
+        if type(itemId) ~= "number" then return false end
+      elseif not isRealItem(itemId) or isUnsafeProgressionItem(itemId) then
         return false
       end
     end
@@ -353,7 +441,8 @@ return function(mod)
   end
 
   local function findVisible(data, source)
-    local map = data.maps and data.maps[source.mapId]
+    local maps = data.maps or data.gen2Maps
+    local map = maps and maps[source.mapId]
     for arrayIndex, object in ipairs(map and map.objects or {}) do
       if (object.index or arrayIndex) == source.objectIndex then return object end
     end
@@ -418,14 +507,69 @@ return function(mod)
       local itemId = mapping.placements[source.key]
       if source.kind == "visible" then
         local object = findVisible(data, source)
-        if object then object.item = itemId; applied = applied + 1 end
+                  if object then
+            object.item = itemValueForGame(game, itemId)
+            applied = applied + 1
+          end
+
       elseif source.kind == "hidden" then
         local entry = findHidden(data, source)
-        if entry then entry.item = itemId; applied = applied + 1 end
+                  if entry then
+            entry.item = itemValueForGame(game, itemId)
+            applied = applied + 1
+          end
+
       end
     end
     return applied
   end
+
+  local function shuffledHeldItem(trainerClass, partyIndex, slot, existingItem)
+    if not (isGen2() and mod.options:get("randomize_held_items") and existingItem
+      and #SAFE_HELD_ITEMS > 0) then
+      return existingItem
+    end
+    local mapping = ensureMapping()
+    mapping.heldItems = mapping.heldItems or {}
+    local key = table.concat({ tostring(trainerClass), tostring(partyIndex), tostring(slot) }, ":")
+    local itemId = mapping.heldItems[key]
+    if not itemId or not ITEM_INFO[itemId] then
+      itemId = SAFE_HELD_ITEMS[love.math.random(#SAFE_HELD_ITEMS)]
+      mapping.heldItems[key] = itemId
+      mod.save:set(MOD_STATE_KEY, mapping)
+    end
+    return itemId
+  end
+
+  -- Gold fruit-tree commands receive a tree number, not an item. Redirect only
+  -- the documented berry-tree opcode and only to another existing berry tree.
+  mod.hooks:wrap("script.command", function(next, ctx, name, args, cmd)
+    if isGen2() and name == "fruittree" and type(cmd) == "table" then
+      local mapping = ensureMapping()
+      local treeId = cmd.tree or (args and args[1])
+      local targetTree = treeId and mapping.placements["berry_tree:" .. tostring(treeId)]
+      if type(targetTree) == "number" then
+        local replacement = {}
+        for key, value in pairs(cmd) do replacement[key] = value end
+        replacement.tree = targetTree
+        return next(ctx, name, args, replacement)
+      end
+    end
+    return next(ctx, name, args, cmd)
+  end)
+
+  mod.hooks:wrap("trainer.party", function(next, trainerClass, partyIndex, party)
+    party = next(trainerClass, partyIndex, party)
+    if not (isGen2() and mod.options:get("randomize_held_items")) then return party end
+    local out = {}
+    for i, member in ipairs(party or {}) do
+      local copy = {}
+      for key, value in pairs(member) do copy[key] = value end
+      if copy.item then copy.item = shuffledHeldItem(trainerClass, partyIndex, i, copy.item) end
+      out[i] = copy
+    end
+    return out
+  end)
 
   local function initializeNewGamePc(save, mapping)
     local itemId = mapping and mapping.placements and mapping.placements["pc:new_game"]

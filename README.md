@@ -1,10 +1,10 @@
 # Item Randomizer
 
-Item Randomizer creates a **persistent per-save mapping** for visible overworld item balls, hidden Itemfinder discoveries, and optionally the one item in the player’s PC on a New Game. The generated pools remain progression-safe: key items, HMs, non-tossable items, and their original sources remain vanilla.
+Item Randomizer creates a **persistent per-save mapping** for visible overworld item balls, hidden Gen 1 Itemfinder discoveries, and optionally the one item in the player’s PC on a New Game. In Gold it also redirects berry-tree rewards and randomizes existing trainer Pokémon held items. The generated pools remain progression-safe: key items, HMs, non-tossable items, and their original sources remain vanilla. **Gold support is declared but untested in a player game.**
 
-## Version 0.0.2
+## Version 0.0.3
 
-This focused maintenance update corrects the New Game PC reroll action. It retains the latest confirmed active save during option-menu transitions, so the reroll can reliably update the live PC item. A successful reroll now also guarantees a **different** safe item rather than appearing to do nothing when the random draw repeats the current item. The protected withdrawal lock and all other randomization behavior are unchanged.
+This update adds a generation-aware Gold path. Gold visible item balls use their native numeric item records; Gold berry trees are redirected only among existing berry trees; and an optional held-item pass changes only Pokémon that already hold an item. The previous reliable New Game PC reroll behavior remains unchanged. **Please treat Gold support as untested and back up a save before trying it.**
 
 ## Options
 
@@ -16,6 +16,8 @@ This focused maintenance update corrects the New Game PC reroll action. It retai
 | **RANDOMIZE ITEMFINDER ITEMS** | On | Includes hidden Itemfinder discoveries. |
 | **RANDOMIZE NEW GAME PC** | On | Replaces the default New Game PC Potion with one safe generated item. It never changes a continued save’s PC contents during ordinary mapping projection. |
 | **REROLL NEW GAME PC ITEM** | Off | One-shot test/action control. Turn it on to reroll only the generated New Game PC item. Turn it off and on again for another reroll. |
+| **RANDOMIZE HELD ITEMS (GOLD)** | On | Changes only existing Gold trainer Pokémon held items, choosing from safe tossable items with a real held effect. |
+| **RANDOMIZE BERRY TREES (GOLD)** | On | Shuffles Gold berry-tree rewards among the existing berry trees; apricorn trees are excluded. |
 
 The source toggles are independent. For an **overworld-only** run, leave **RANDOMIZE OVERWORLD BALLS** on and switch Itemfinder Items and New Game PC off. For an **Itemfinder-only** run, do the reverse.
 
@@ -27,7 +29,7 @@ This is deliberately **weighted, not locked**. An early Viridian Forest pickup i
 
 ## Safety rules
 
-The mod excludes key items, HMs, non-tossable items, and all of their original map/hidden-item sources from randomization. This avoids granting progression-critical items early and prevents the randomizer from removing the originals that the story needs. Shops, scripted gifts, gym rewards, trainer rewards, hidden coins, static Pokémon, and encounters are also outside the mod’s scope.
+The mod excludes key items, HMs, non-tossable items, and all of their original map/hidden-item sources from randomization. This avoids granting progression-critical items early and prevents the randomizer from removing the originals that the story needs. Gold berry remapping never points to an apricorn tree, and Gold held-item randomization never creates a held item on a Pokémon that originally had none. Shops, scripted gifts, gym rewards, trainer rewards, hidden coins, static Pokémon, and encounters are otherwise outside the mod’s scope.
 
 ## PC reroll safeguard
 
@@ -41,7 +43,7 @@ If the mod is first enabled on an existing save, it creates safe placements for 
 
 ## Install
 
-Import `item_randomizer-0.0.2.zip` using Gen 1 Recomp’s **Import mod .zip** action. Alternatively, extract it so the final structure is exactly:
+Import `item_randomizer-0.0.3.zip` using Gen 1 Recomp’s **Import mod .zip** action. Alternatively, extract it so the final structure is exactly:
 
 ```text
 mods/
@@ -59,4 +61,4 @@ This mod changes item placement data at runtime. It is independent of Gym Leader
 
 ## Verification status
 
-The manifest has been checked as valid JSON, `main.lua` has passed offline Lua syntax validation, and an isolated harness verifies key/HM exclusion, reliable live-save PC rerolling, guaranteed changed reroll results, permanent withdrawal locking, and mapping projection. It has not been run against a player-imported game in this environment.
+The manifest has been checked as valid JSON and `main.lua` has passed offline Lua syntax validation. Isolated harnesses verify the existing Gen 1 safety/PC behavior plus Gold numeric map items, berry-tree command rewriting, and safe existing-held-item replacement. **Gold has not been run in a player-imported game**, so please back up a save before testing it.
