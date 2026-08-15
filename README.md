@@ -6,7 +6,7 @@ Item Randomizer creates a persistent per-save item mapping for Gen 1 and Gold. I
 
 ## Install
 
-Import the `item_randomizer-1.0.1.zip` release archive through Gen 1 Recomp’s **Import mod .zip** action. The archive extracts directly to an `item_randomizer/` folder containing `manifest.json` and `main.lua`.
+Import the `item_randomizer-1.0.2.zip` release archive through Gen 1 Recomp’s **Import mod .zip** action. The archive extracts directly to an `item_randomizer/` folder containing `manifest.json` and `main.lua`.
 
 ## Features
 
@@ -14,7 +14,7 @@ Visible item balls, hidden Itemfinder rewards, and the optional New Game PC item
 
 **Reduced Low-Value Items** lowers the weight of common low-impact rewards. **Progression-Weighted Loot** favors modest useful items early and stronger rewards later, while always retaining a small chance of premium results. The generator is weighted rather than locked, so surprising early rewards remain possible.
 
-The New Game PC feature replaces only the generated starting PC item. Its reroll action affects only that generated result and permanently locks after the item is withdrawn, preventing storage from becoming a repeatable item-generation loop.
+In **Gen 1**, the New Game PC feature replaces only the generated starting PC item. If a fresh save still has its untouched native Potion or an empty PC after startup, the mod retries that placement without changing an established PC. **NEW GAME PC ITEM** can choose five Great Balls, Rare Candies, Potions, Antidotes, Escape Ropes, or a five-item basic mix; it also supports an intentional **NO ITEM** result. **RANDOM (1 ITEM)** preserves the original randomized starting-item behavior. The random reroll affects only that generated result and permanently locks after the generated contents are withdrawn, preventing storage from becoming a repeatable item-generation loop.
 
 ## Gold
 

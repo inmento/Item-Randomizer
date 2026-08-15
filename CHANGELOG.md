@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.2 — Gen 1 New Game PC Refresh and Choice Fix
+
+Gen 1 now retries the New Game PC placement only when the PC still has its untouched native Potion or is empty. This corrects a missed fresh-save placement without replacing the contents of an established PC.
+
+**NEW GAME PC ITEM** is a Gen 1 fallback selector for players who want a reliable visible result instead of a random reroll. It offers five Great Balls, Rare Candies, Potions, Antidotes, Escape Ropes, or a five-item basic mix, plus an intentional **NO ITEM** result. The original random one-item mode and protected reroll remain available. The PC choice and reroll still lock permanently after the generated contents are withdrawn.
+
+Gold behavior is unchanged in this release.
+
 ## 1.0.1 — Gold PC Item Fix
 
 Gold now receives a generated starting PC item when **GOLD START PC** is enabled. Gold’s native New Game PC begins empty, so the mod now seeds its saved safe item through Gold’s new-save event rather than relying on the Gen 1-style New Game hook.

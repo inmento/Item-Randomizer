@@ -389,6 +389,22 @@ return function(mod)
       default = true,
     },
     {
+      key = "pc_start_choice",
+      label = "NEW GAME PC ITEM",
+      type = "choice",
+      default = "RANDOM",
+      choices = {
+        { "RANDOM (1 ITEM)", "RANDOM" },
+        { "5 GREAT BALLS", "GREAT_BALL" },
+        { "5 RARE CANDIES", "RARE_CANDY" },
+        { "5 POTIONS", "POTION" },
+        { "5 ANTIDOTES", "ANTIDOTE" },
+        { "5 ESCAPE ROPES", "ESCAPE_ROPE" },
+        { "5 BASIC ITEMS", "BASIC" },
+        { "NO ITEM", "NONE" },
+      },
+    },
+    {
       key = "reroll_pc_item",
       label = "REROLL NEW GAME PC ITEM",
       type = "toggle",
@@ -633,7 +649,9 @@ return function(mod)
     end
     for _, source in ipairs(selectedSources(mapping.options)) do
       local itemId = mapping.placements[source.key]
-      if not isRealItem(itemId) or isUnsafeProgressionItem(itemId) then
+      local intentionallyEmptyPc = source.kind == "pc" and mapping.pcChoice == "NONE"
+      if not intentionallyEmptyPc
+        and (not isRealItem(itemId) or isUnsafeProgressionItem(itemId)) then
         return false
       end
     end
@@ -732,17 +750,96 @@ return function(mod)
     return applied
   end
 
-  local function initializeNewGamePc(save, mapping)
-    local itemId = mapping and mapping.placements and mapping.placements["pc:new_game"]
-    if isRealItem(itemId) then save.pcItems = { [itemId] = 1 } end
+  local BASIC_PC_ITEMS = { "POKE_BALL", "POTION", "ANTIDOTE", "ESCAPE_ROPE", "REPEL" }
+
+  local function setPcContents(save, itemId, quantity)
+    if not save then return false end
+    save.pcItems = {}
+    if isRealItem(itemId) and (tonumber(quantity) or 0) > 0 then
+      save.pcItems[itemId] = math.floor(quantity)
+    end
+    return true
   end
 
-  local function pcContainsOnly(save, expectedItem)
+  local function pcStoredItem(mapping)
+    return mapping and mapping.placements and mapping.placements["pc:new_game"]
+  end
+
+  local function pcStoredQuantity(mapping)
+    return math.max(0, math.floor(tonumber(mapping and mapping.pcQuantity) or 1))
+  end
+
+  local function pcContainsOnly(save, expectedItem, expectedQuantity)
     local pcItems = save and save.pcItems
-    if type(pcItems) ~= "table" or pcItems[expectedItem] ~= 1 then return false end
+    if type(pcItems) ~= "table" then return false end
+    expectedQuantity = math.max(0, math.floor(tonumber(expectedQuantity) or 0))
+    if expectedQuantity == 0 then return next(pcItems) == nil end
+    if pcItems[expectedItem] ~= expectedQuantity then return false end
     local count = 0
     for _ in pairs(pcItems) do count = count + 1 end
     return count == 1
+  end
+
+  local function pcLooksFresh(save)
+    local pcItems = save and save.pcItems
+    if type(pcItems) ~= "table" or next(pcItems) == nil then return true end
+    return pcItems.POTION == 1 and next(pcItems, "POTION") == nil
+  end
+
+  local function manualPcBundle(choice)
+    if choice == "NONE" then return nil, 0 end
+    if choice == "BASIC" then
+      local usable = {}
+      for _, itemId in ipairs(BASIC_PC_ITEMS) do
+        if isRealItem(itemId) and not isUnsafeProgressionItem(itemId) then
+          usable[#usable + 1] = itemId
+        end
+      end
+      if #usable == 0 then return nil, nil end
+      return usable[love.math.random(#usable)], 5
+    end
+    if choice and choice ~= "RANDOM" and isRealItem(choice)
+      and not isUnsafeProgressionItem(choice) then
+      return choice, 5
+    end
+    return nil, nil
+  end
+
+  local function applyManualPcChoice(mapping, choice)
+    if choice == "RANDOM" then return false end
+    local itemId, quantity = manualPcBundle(choice)
+    if quantity == nil then return false end
+    mapping.pcChoice = choice
+    mapping.pcQuantity = quantity
+    mapping.placements["pc:new_game"] = itemId
+    return true
+  end
+
+  local function initializeNewGamePc(save, mapping)
+    if not (save and validMapping(mapping) and mapping.options.starting_pc_item) then return false end
+    local choice = mod.options:get("pc_start_choice") or "RANDOM"
+    if choice ~= "RANDOM" and not applyManualPcChoice(mapping, choice) then
+      mod.log:warn("New Game PC choice is unavailable in this game data; keeping the random item")
+    elseif choice == "RANDOM" then
+      mapping.pcChoice = "RANDOM"
+      mapping.pcQuantity = 1
+    end
+    local itemId, quantity = pcStoredItem(mapping), pcStoredQuantity(mapping)
+    setPcContents(save, itemId, quantity)
+    mapping.pcInitialized = true
+    mod.save:set(MOD_STATE_KEY, mapping)
+    return true
+  end
+
+  -- The save hook is the normal placement path. This narrow retry covers a
+  -- fresh save whose PC UI was constructed before that hook was observed; it
+  -- only replaces the native single Potion or an empty fresh PC, never an
+  -- established player's stored items.
+  local function refreshFreshNewGamePc(save, mapping)
+    if mapping and not mapping.pcRerollLocked and not mapping.pcInitialized and pcLooksFresh(save) then
+      return initializeNewGamePc(save, mapping)
+    end
+    return false
   end
 
   -- This is checked on every screen close and again before a reroll. Once the
@@ -756,9 +853,7 @@ return function(mod)
       or mapping.pcRerollLocked then
       return false
     end
-    local expectedItem = mapping.placements[source.key]
-    if isRealItem(expectedItem)
-      and not (game.save.pcItems and game.save.pcItems[expectedItem]) then
+    if not pcContainsOnly(game.save, pcStoredItem(mapping), pcStoredQuantity(mapping)) then
       mapping.pcRerollLocked = true
       mod.save:set(MOD_STATE_KEY, mapping)
       mod.log:info("PC rerolls permanently locked: the generated starting item was withdrawn")
@@ -767,45 +862,73 @@ return function(mod)
     return false
   end
 
-  -- PC rerolls are intentionally narrow: they only replace the generated
-  -- starting item while the PC still contains exactly that one generated copy.
-  -- A withdrawal permanently locks the feature for this save.
+  local function canRefreshPcChoice(game, mapping)
+    if not (game and game.save and validMapping(mapping)) then return false end
+    if lockPcRerollAfterWithdrawal() or mapping.pcRerollLocked then
+      mod.log:warn("New Game PC item is locked because the generated item was withdrawn")
+      return false
+    end
+    return pcContainsOnly(game.save, pcStoredItem(mapping), pcStoredQuantity(mapping))
+      or (not mapping.pcInitialized and pcLooksFresh(game.save))
+  end
+
+  local function selectNewGamePcItem()
+    local game = liveGame()
+    local mapping = ensureMapping()
+    if not canRefreshPcChoice(game, mapping) then
+      mod.log:warn("New Game PC item can only change while its generated contents remain in the PC")
+      return false
+    end
+    local choice = mod.options:get("pc_start_choice") or "RANDOM"
+    if choice == "RANDOM" then
+      local source, oldItem = SOURCE_BY_KEY["pc:new_game"], pcStoredItem(mapping)
+      local replacement = nil
+      for _ = 1, 24 do
+        local candidate = itemForSource(source, mapping.options)
+        if candidate and candidate ~= oldItem then replacement = candidate; break end
+      end
+      if not replacement then
+        for _, candidate in ipairs(SAFE_ITEMS) do
+          if candidate ~= oldItem then replacement = candidate; break end
+        end
+      end
+      if not replacement then return false end
+      mapping.pcChoice, mapping.pcQuantity = "RANDOM", 1
+      mapping.placements[source.key] = replacement
+    elseif not applyManualPcChoice(mapping, choice) then
+      mod.log:warn("Selected New Game PC item is unavailable in this game data")
+      return false
+    end
+    setPcContents(game.save, pcStoredItem(mapping), pcStoredQuantity(mapping))
+    mapping.pcInitialized = true
+    mod.save:set(MOD_STATE_KEY, mapping)
+    return true
+  end
+
+  -- PC rerolls are intentionally narrow: they only replace a random generated
+  -- starting item while the PC still contains its generated contents. A manual
+  -- five-item choice is selected directly through NEW GAME PC ITEM instead.
   local function rerollNewGamePc()
     local game = liveGame()
     local mapping = ensureMapping()
     local source = SOURCE_BY_KEY["pc:new_game"]
-    if lockPcRerollAfterWithdrawal() or mapping.pcRerollLocked then
-      mod.log:warn("PC reroll is permanently disabled for this save because the starting item was withdrawn")
+    if (mapping.pcChoice and mapping.pcChoice ~= "RANDOM") then
+      mod.log:warn("Choose RANDOM (1 ITEM) before using the New Game PC reroll")
       return false
     end
-    local oldItem = mapping.placements and mapping.placements[source.key]
-    if not (game and game.save and source and oldItem) then
-      mod.log:warn("PC reroll is unavailable without a generated New Game PC item")
+    if not canRefreshPcChoice(game, mapping) then
+      mod.log:warn("PC reroll is unavailable because the generated item is no longer in the PC")
       return false
     end
-    if not pcContainsOnly(game.save, oldItem) then
-      mod.log:warn("PC reroll refused: the PC must contain only its generated starting item")
-      return false
-    end
-
-    -- A reroll must visibly change the PC item. Repeating a random result is
-    -- technically possible, but feels broken and can make the action appear to
-    -- do nothing. Retry the normal pool first, then choose another safe record
-    -- deterministically if an unlucky or mocked RNG keeps returning oldItem.
+    local oldItem = pcStoredItem(mapping)
     local replacement = nil
     for _ = 1, 24 do
       local candidate = itemForSource(source, mapping.options)
-      if candidate and candidate ~= oldItem then
-        replacement = candidate
-        break
-      end
+      if candidate and candidate ~= oldItem then replacement = candidate; break end
     end
     if not replacement then
       for _, candidate in ipairs(SAFE_ITEMS) do
-        if candidate ~= oldItem then
-          replacement = candidate
-          break
-        end
+        if candidate ~= oldItem then replacement = candidate; break end
       end
     end
     if not replacement then
@@ -813,9 +936,11 @@ return function(mod)
       return false
     end
     mapping.placements[source.key] = replacement
+    mapping.pcChoice, mapping.pcQuantity = "RANDOM", 1
+    mapping.pcInitialized = true
     mapping.pcRerolls = (tonumber(mapping.pcRerolls) or 0) + 1
+    setPcContents(game.save, replacement, 1)
     mod.save:set(MOD_STATE_KEY, mapping)
-    game.save.pcItems = { [replacement] = 1 }
     mod.log:info("Rerolled New Game PC item (%d)", mapping.pcRerolls)
     return true
   end
@@ -830,6 +955,7 @@ return function(mod)
   local function activateCurrentSave(game)
     game = rememberActiveGame(game)
     local mapping = ensureMapping()
+    if game and game.save then refreshFreshNewGamePc(game.save, mapping) end
     local applied = applyMapping(game, mapping)
     mod.log:info("Applied safe item mapping to %d selected visible/hidden sources", applied)
   end
@@ -855,6 +981,10 @@ return function(mod)
     -- compatibility with other event producers.
     local changedModId = type(event.mod) == "table" and event.mod.id or event.mod
     if changedModId ~= mod.id then return end
-    if event.key == "reroll_pc_item" and event.value then rerollNewGamePc() end
+    if event.key == "pc_start_choice" then
+      selectNewGamePcItem()
+    elseif event.key == "reroll_pc_item" and event.value then
+      rerollNewGamePc()
+    end
   end)
 end
