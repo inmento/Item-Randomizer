@@ -6,7 +6,7 @@ Item Randomizer creates a persistent per-save item mapping for Gen 1 and Gold. I
 
 ## Install
 
-Import the `item_randomizer-1.0.0.zip` release archive through Gen 1 Recomp’s **Import mod .zip** action. The archive extracts directly to an `item_randomizer/` folder containing `manifest.json` and `main.lua`.
+Import the `item_randomizer-1.0.1.zip` release archive through Gen 1 Recomp’s **Import mod .zip** action. The archive extracts directly to an `item_randomizer/` folder containing `manifest.json` and `main.lua`.
 
 ## Features
 
@@ -24,4 +24,4 @@ Berry-tree handling preserves apricorn trees. Held-item handling affects only Po
 
 ## Compatibility
 
-Item Randomizer targets Mod API 2 and supports Gen 1 and Gold. It can be used alongside Gym Leader Shuffle and Starter Picker. See [CHANGELOG.md](CHANGELOG.md) for the complete 1.0.0 feature list and safety rules.
+Item Randomizer targets Mod API 2 and supports Gen 1 and Gold. It can be used alongside Gym Leader Shuffle and Starter Picker. See [CHANGELOG.md](CHANGELOG.md) for the complete release feature list and safety rules.

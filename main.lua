@@ -206,8 +206,11 @@ return function(mod)
     local function setPcForNewGame(game, save)
       if not mod.options:get("gold_pc_item") then return end
       local current = mapping(game)
+      if current.pcPlaced then return end
       local item = current.placements["pc:new"]
       if not safeItem(game, item) then return end
+      -- Gold starts with an empty item PC. Seed one generated stack when its
+      -- actual new-save event fires, then use this saved source for rerolls.
       save.pcItems = { [item] = 1 }
       current.pcPlaced, current.pcLocked = true, false
       mod.save:set(STATE_KEY, current)
@@ -256,7 +259,11 @@ return function(mod)
     end)
 
     mod.events:on("game.ready", function(event) applyMapSources((event and event.game) or mod.game) end)
-    mod.events:on("save.created", function(event) applyMapSources((event and event.game) or mod.game) end)
+    mod.events:on("save.created", function(event)
+      local game = (event and event.game) or mod.game
+      setPcForNewGame(game, (event and event.save) or (game and game.save))
+      applyMapSources(game)
+    end)
     mod.events:on("save.loaded", function(event) applyMapSources((event and event.game) or mod.game) end)
     mod.events:on("screen.popped", function() lockPc(mod.game) end)
 

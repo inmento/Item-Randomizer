@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.1 — Gold PC Item Fix
+
+Gold now receives a generated starting PC item when **GOLD START PC** is enabled. Gold’s native New Game PC begins empty, so the mod now seeds its saved safe item through Gold’s new-save event rather than relying on the Gen 1-style New Game hook.
+
+The generated PC item can be rerolled with **GOLD REROLL PC** while it remains in the PC. Once that item is withdrawn, rerolls permanently lock for the save as intended.
+
 ## 1.0.0 — Full Release
 
 Item Randomizer 1.0.0 provides persistent, progression-conscious randomization for Gen 1 and Gold item sources. Each save receives a stable mapping, so a pickup remains the same after leaving an area, saving, or reloading.
