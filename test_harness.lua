@@ -7,8 +7,6 @@ local optionValues = {
   itemfinder_items = true,
   starting_pc_item = true,
   reroll_pc_item = false,
-  randomize_held_items = false,
-  randomize_overworld_berries = false,
 }
 
 -- Deterministic highest-ticket selection: the test checks safety and state
@@ -58,7 +56,7 @@ local mod = {
 
 local entry = assert(loadfile("/home/ubuntu/item_randomizer/main.lua"))
 entry()(mod)
-assert(#callbacks.schema == 8, "eight safe-weighted Gen 1/Gold randomizer options were not defined")
+assert(#callbacks.schema == 6, "six safe-weighted randomizer options were not defined")
 
 local save = { pcItems = { POTION = 1 }, modData = {}, inventory = {} }
 callbacks.hooks["save.new_game"](function(s) return s end, save)
@@ -67,7 +65,7 @@ mod.game = game
 callbacks.events["game.ready"]({ game = game })
 
 local mapping = store.item_mapping
-assert(mapping and mapping.version == 4 and mapping.placements, "v4 mapping was not stored")
+assert(mapping and mapping.version == 3 and mapping.placements, "v3 mapping was not stored")
 for _, itemId in pairs(mapping.placements) do
   assert(itemId ~= "BICYCLE" and itemId ~= "HM_01", "unsafe key/HM item entered a generated placement")
 end

@@ -1,12 +1,13 @@
 {
   "id": "item_randomizer",
   "name": "Item Randomizer",
-  "version": "0.0.3",
+  "version": "1.0.0",
   "entry": "main.lua",
   "api": 2,
   "category": "GAMEPLAY",
   "profile": "content",
   "games": ["gen1", "gen2"],
   "affects_link": false,
-  "description": "Safe Gen 1 and Gold item randomization for overworld pickups, Gold berry trees and existing held items, progression-weighted loot, and a protected New Game PC reroll. Gold support is untested."
+  "github": "inmento/Item-Randomizer",
+  "description": "Safe item randomization for map pickups, hidden finds, berries, gifts, eligible held items, and a protected New Game PC reroll in Gen 1 and Gold."
 }

@@ -2,65 +2,26 @@
 
 > **AI assisted; not AI created.**
 
-Item Randomizer creates a **persistent per-save mapping** for visible overworld item balls, hidden Gen 1 Itemfinder discoveries, and optionally the one item in the player’s PC on a New Game. In Gold it also redirects berry-tree rewards and randomizes existing trainer Pokémon held items. The generated pools remain progression-safe: key items, HMs, non-tossable items, and their original sources remain vanilla. **Gold support is declared but untested in a player game.**
-
-## Version 0.0.3
-
-This update adds a generation-aware Gold path. Gold visible item balls use their native numeric item records; Gold berry trees are redirected only among existing berry trees; and an optional held-item pass changes only Pokémon that already hold an item. The previous reliable New Game PC reroll behavior remains unchanged. **Please treat Gold support as untested and back up a save before trying it.**
-
-## Options
-
-| Option | Default | Effect |
-|---|---:|---|
-| **REDUCE LOW-VALUE ITEMS** | On | Strongly reduces status cures, X-items, Repels, standard Potions, Escape Ropes, Poké Dolls, and comparable low-value rewards in weighted mode. |
-| **PROGRESSION-WEIGHTED LOOT** | On | Uses the source location’s estimated game progression. Early locations favor modest but useful items; later locations increasingly favor stronger rewards. Every tier keeps a small chance of a high-tier reward. |
-| **RANDOMIZE OVERWORLD BALLS** | On | Includes visible map-object item balls. |
-| **RANDOMIZE ITEMFINDER ITEMS** | On | Includes hidden Itemfinder discoveries. |
-| **RANDOMIZE NEW GAME PC** | On | Replaces the default New Game PC Potion with one safe generated item. It never changes a continued save’s PC contents during ordinary mapping projection. |
-| **REROLL NEW GAME PC ITEM** | Off | One-shot test/action control. Turn it on to reroll only the generated New Game PC item. Turn it off and on again for another reroll. |
-| **RANDOMIZE HELD ITEMS (GOLD)** | On | Changes only existing Gold trainer Pokémon held items, choosing from safe tossable items with a real held effect. |
-| **RANDOMIZE BERRY TREES (GOLD)** | On | Shuffles Gold berry-tree rewards among the existing berry trees; apricorn trees are excluded. |
-
-The source toggles are independent. For an **overworld-only** run, leave **RANDOMIZE OVERWORLD BALLS** on and switch Itemfinder Items and New Game PC off. For an **Itemfinder-only** run, do the reverse.
-
-## Progression-weighted loot
-
-The weighted generator assigns each visible or hidden source an approximate game-progress tier from its map. Pallet, Viridian, Viridian Forest, Routes 1–3, Pewter, and Mt. Moon are early-tier locations. Cerulean/Vermilion areas are early-mid tier; Rock Tunnel, Lavender, and Celadon form the middle tier; Fuchsia/Saffron/Safari/Silph areas are late-mid tier; and Cinnabar, Seafoam, Victory Road, Indigo Plateau, and Cerulean Cave are late-tier locations.
-
-This is deliberately **weighted, not locked**. An early Viridian Forest pickup is much more likely to be a modest useful item, but it can still roll a Rare Candy or other premium safe item. Conversely, late-game sources remain capable of producing ordinary rewards.
-
-## Safety rules
-
-The mod excludes key items, HMs, non-tossable items, and all of their original map/hidden-item sources from randomization. This avoids granting progression-critical items early and prevents the randomizer from removing the originals that the story needs. Gold berry remapping never points to an apricorn tree, and Gold held-item randomization never creates a held item on a Pokémon that originally had none. Shops, scripted gifts, gym rewards, trainer rewards, hidden coins, static Pokémon, and encounters are otherwise outside the mod’s scope.
-
-## PC reroll safeguard
-
-**REROLL NEW GAME PC ITEM** is available only while the generated starting item remains in the PC. The moment that generated item is withdrawn, the mod permanently locks PC rerolls for that save. Depositing the item back later does not reopen the feature. This lets you reroll safely at the beginning, but prevents PC storage from becoming an item-generation loop after the reward has entered play. A successful reroll updates only the PC starting item and its saved mapping; it does not reroll overworld or Itemfinder placements.
-
-## Persistence
-
-The mod stores its setting snapshot and placements when a save first receives a mapping. Continuing the save restores the same placements. Changing settings afterward does not silently alter an established run. The PC reroll is the sole intentional exception and only changes the protected New Game PC source.
-
-If the mod is first enabled on an existing save, it creates safe placements for uncollected enabled visible/hidden sources. It leaves existing PC contents untouched.
+Item Randomizer creates a persistent per-save item mapping for Gen 1 and Gold. It supports independent source categories, progression-conscious item weighting, and safeguards that keep key items, HMs, non-tossable items, and other progression-sensitive rewards outside ordinary item pools.
 
 ## Install
 
-Import `item_randomizer-0.0.3.zip` using Gen 1 Recomp’s **Import mod .zip** action. Alternatively, extract it so the final structure is exactly:
+Import the `item_randomizer-1.0.0.zip` release archive through Gen 1 Recomp’s **Import mod .zip** action. The archive extracts directly to an `item_randomizer/` folder containing `manifest.json` and `main.lua`.
 
-```text
-mods/
-└── item_randomizer/
-    ├── manifest.json
-    ├── main.lua
-    └── README.md
-```
+## Features
 
-Do not leave the ZIP unopened in the `mods/` folder, and do not nest a second parent folder between `item_randomizer/` and `manifest.json`.
+Visible item balls, hidden Itemfinder rewards, and the optional New Game PC item can be enabled independently. Once a save receives its mapping, that mapping remains stable across map changes, saves, and reloads.
+
+**Reduced Low-Value Items** lowers the weight of common low-impact rewards. **Progression-Weighted Loot** favors modest useful items early and stronger rewards later, while always retaining a small chance of premium results. The generator is weighted rather than locked, so surprising early rewards remain possible.
+
+The New Game PC feature replaces only the generated starting PC item. Its reroll action affects only that generated result and permanently locks after the item is withdrawn, preventing storage from becoming a repeatable item-generation loop.
+
+## Gold
+
+Gold adds native support for visible item balls, hidden item records, berry trees, eligible ordinary scripted gifts, eligible existing held items, and the protected New Game PC reroll.
+
+Berry-tree handling preserves apricorn trees. Held-item handling affects only Pokémon that originally held an item; it does not assign an item to an itemless Pokémon. Scripted gifts use the same safe item rules as other enabled sources.
 
 ## Compatibility
 
-This mod changes item placement data at runtime. It is independent of Gym Leader Shuffle and Starter Picker and may be enabled alongside them.
-
-## Verification status
-
-The manifest has been checked as valid JSON and `main.lua` has passed offline Lua syntax validation. Isolated harnesses verify the existing Gen 1 safety/PC behavior plus Gold numeric map items, berry-tree command rewriting, and safe existing-held-item replacement. **Gold has not been run in a player-imported game**, so please back up a save before testing it.
+Item Randomizer targets Mod API 2 and supports Gen 1 and Gold. It can be used alongside Gym Leader Shuffle and Starter Picker. See [CHANGELOG.md](CHANGELOG.md) for the complete 1.0.0 feature list and safety rules.
