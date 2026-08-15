@@ -1,5 +1,7 @@
 # Item Randomizer
 
+> **AI assisted; not AI created.**
+
 Item Randomizer creates a **persistent per-save mapping** for visible overworld item balls, hidden Gen 1 Itemfinder discoveries, and optionally the one item in the player’s PC on a New Game. In Gold it also redirects berry-tree rewards and randomizes existing trainer Pokémon held items. The generated pools remain progression-safe: key items, HMs, non-tossable items, and their original sources remain vanilla. **Gold support is declared but untested in a player game.**
 
 ## Version 0.0.3
