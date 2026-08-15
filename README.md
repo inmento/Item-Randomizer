@@ -25,3 +25,7 @@ Berry-tree handling preserves apricorn trees. Held-item handling affects only Po
 ## Compatibility
 
 Item Randomizer targets Mod API 2 and supports Gen 1 and Gold. It can be used alongside Gym Leader Shuffle and Starter Picker. See [CHANGELOG.md](CHANGELOG.md) for the complete release feature list and safety rules.
+
+## Credits
+
+Thanks to [Wes Kestis](https://github.com/weskestis), creator of the [RBY Randomizer — Kanto Ascendent Compatible](https://github.com/weskestis/RBY-Randomizer-Kanto-Ascendent-Compatible), for granting permission to review the Randomizer and build compatible behavior.
