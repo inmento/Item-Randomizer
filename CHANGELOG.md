@@ -1,12 +1,26 @@
 # Changelog
 
-## 1.0.2 — Gen 1 New Game PC Refresh and Choice Fix
+## 1.0.4 — Gen 1 Reroll Hotfix and Gen 2 Stability
+
+Gen 1 **REROLL NEW GAME PC ITEM** now reliably performs its one-shot action: it changes the still-stored generated PC item, writes the toggle back to OFF, and returns from Mods and the Start menu to the overworld. The reroll is no longer permanently disabled by an unrelated fade or screen close before the fresh PC item has been initialized. A permanent lock is recorded only when a player deliberately attempts a reroll after the initialized generated contents have left the PC.
+
+Item Randomizer now reads the engine’s active `GameVersion.get()` value to choose its Gen 1 or Gold branch before registering generation-specific options and behavior. Gen 1 retains the protected random PC reroll without showing the Gold-only manual PC selector; Gold retains its dedicated PC selection and reroll options.
+
+## 1.0.3 — Gen 1 PC Reroll Action Fix
+
+Gen 1 no longer treats every screen close, fade, or ordinary menu transition as proof that the generated PC item was withdrawn. This prevents fresh saves from being permanently locked before their PC item has been initialized.
+
+**REROLL NEW GAME PC ITEM** remains visible in Gen 1 and is now a complete one-shot action: turn it ON to reroll the generated PC item, reset the option to OFF immediately, and return from **Mods** and the Gen 1 Start menu to the overworld. The permanent lock is now recorded only if the player deliberately tries to reroll after the initialized generated PC contents are no longer present.
+
+The manual **GOLD PC ITEM** selector remains Gold-only and does not appear in the Gen 1 options list.
+
+## 1.0.2 — Gen 1 PC Refresh and Reroll Fix
 
 Gen 1 now retries the New Game PC placement only when the PC still has its untouched native Potion or is empty. This corrects a missed fresh-save placement without replacing the contents of an established PC.
 
-**NEW GAME PC ITEM** is a Gen 1 fallback selector for players who want a reliable visible result instead of a random reroll. It offers five Great Balls, Rare Candies, Potions, Antidotes, Escape Ropes, or a five-item basic mix, plus an intentional **NO ITEM** result. The original random one-item mode and protected reroll remain available. The PC choice and reroll still lock permanently after the generated contents are withdrawn.
+The Gen 1 PC reroll toggle now starts OFF, performs a one-shot reroll when enabled, immediately returns to OFF, and permanently locks after the generated contents are withdrawn. The manual PC-item selector is no longer included in the Gen 1 schema.
 
-Gold behavior is unchanged in this release.
+The manual **GOLD PC ITEM** selector is available only in Gold, where it offers a random one-item result, five Great Balls, Rare Candies, Potions, Antidotes, Escape Ropes, a basic five-item mix, or no item. Gold’s existing random PC behavior remains the default.
 
 ## 1.0.1 — Gold PC Item Fix
 

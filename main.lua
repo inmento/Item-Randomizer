@@ -7,9 +7,12 @@
 -- later, while always retaining a small chance of an early lucky find.
 
 return function(mod)
-  local function isGen2(game)
-    game = game or mod.game
-    return game and game.data and game.data.gen2Maps ~= nil
+  -- The selected game version is established before mods load. Use the engine's
+  -- version source of truth rather than inferring a generation from data shape.
+  local GameVersion = require("src.core.GameVersion")
+  local playing = GameVersion.get()
+  local function isGen2(_)
+    return playing == "gold"
   end
 
   if isGen2() then
@@ -26,6 +29,17 @@ return function(mod)
       { key = "gold_gift_items", label = "GOLD GIFT ITEMS", type = "toggle", default = false },
       { key = "gold_held_items", label = "GOLD HELD ITEMS", type = "toggle", default = false },
       { key = "gold_pc_item", label = "GOLD START PC", type = "toggle", default = false },
+      { key = "pc_start_choice", label = "GOLD PC ITEM", type = "choice", default = "RANDOM",
+        choices = {
+          { "RANDOM (1 ITEM)", "RANDOM" },
+          { "5 GREAT BALLS", "GREAT_BALL" },
+          { "5 RARE CANDIES", "RARE_CANDY" },
+          { "5 POTIONS", "POTION" },
+          { "5 ANTIDOTES", "ANTIDOTE" },
+          { "5 ESCAPE ROPES", "ESCAPE_ROPE" },
+          { "5 BASIC ITEMS", "BASIC" },
+          { "NO ITEM", "NONE" },
+        } },
       { key = "gold_reroll_pc", label = "GOLD REROLL PC", type = "toggle", default = false },
     })
 
@@ -203,21 +217,48 @@ return function(mod)
       return item
     end
 
+    local GOLD_BASIC_PC_ITEMS = { "POKE_BALL", "POTION", "ANTIDOTE", "ESCAPE_ROPE", "REPEL" }
+
+    local function manualGoldPcBundle(game, choice)
+      if choice == "NONE" then return nil, 0 end
+      if choice == "BASIC" then
+        local pool = {}
+        for _, itemId in ipairs(GOLD_BASIC_PC_ITEMS) do
+          if safeItem(game, itemId) then pool[#pool + 1] = itemId end
+        end
+        if #pool == 0 then return nil, nil end
+        return randomFrom(pool), 5
+      end
+      if choice and choice ~= "RANDOM" and safeItem(game, choice) then
+        return choice, 5
+      end
+      return nil, nil
+    end
+
     local function setPcForNewGame(game, save)
       if not mod.options:get("gold_pc_item") then return end
       local current = mapping(game)
       if current.pcPlaced then return end
-      local item = current.placements["pc:new"]
-      if not safeItem(game, item) then return end
+      local choice = mod.options:get("pc_start_choice") or "RANDOM"
+      local item, quantity = manualGoldPcBundle(game, choice)
+      if quantity == nil then
+        choice, item, quantity = "RANDOM", current.placements["pc:new"], 1
+      end
+      if quantity > 0 and not safeItem(game, item) then return end
       -- Gold starts with an empty item PC. Seed one generated stack when its
       -- actual new-save event fires, then use this saved source for rerolls.
-      save.pcItems = { [item] = 1 }
+      save.pcItems = {}
+      if quantity > 0 then save.pcItems[item] = quantity end
+      current.placements["pc:new"] = item
+      current.pcChoice, current.pcQuantity = choice, quantity
       current.pcPlaced, current.pcLocked = true, false
       mod.save:set(STATE_KEY, current)
     end
 
-    local function pcStillContains(save, item)
-      if type(save and save.pcItems) ~= "table" or save.pcItems[item] ~= 1 then return false end
+    local function pcStillContains(save, item, quantity)
+      quantity = math.max(0, math.floor(tonumber(quantity) or 1))
+      if quantity == 0 then return type(save and save.pcItems) == "table" and next(save.pcItems) == nil end
+      if type(save and save.pcItems) ~= "table" or save.pcItems[item] ~= quantity then return false end
       local count = 0
       for _ in pairs(save.pcItems) do count = count + 1 end
       return count == 1
@@ -227,7 +268,7 @@ return function(mod)
       local current = mapping(game)
       if not current.pcPlaced or current.pcLocked then return current.pcLocked end
       local item = current.placements["pc:new"]
-      if not pcStillContains(game and game.save, item) then
+      if not pcStillContains(game and game.save, item, current.pcQuantity) then
         current.pcLocked = true
         mod.save:set(STATE_KEY, current)
       end
@@ -238,7 +279,7 @@ return function(mod)
       local current = mapping(game)
       if not current.pcPlaced or lockPc(game) then return end
       local old = current.placements["pc:new"]
-      if not pcStillContains(game and game.save, old) then return end
+      if not pcStillContains(game and game.save, old, current.pcQuantity) then return end
       local pool = safeItemPool(game)
       local replacement = old
       for _ = 1, 24 do
@@ -247,6 +288,7 @@ return function(mod)
       end
       if replacement and replacement ~= old then
         current.placements["pc:new"] = replacement
+        current.pcChoice, current.pcQuantity = "RANDOM", 1
         game.save.pcItems = { [replacement] = 1 }
         mod.save:set(STATE_KEY, current)
       end
@@ -331,6 +373,47 @@ return function(mod)
     return activeGame
   end
 
+  -- Mod API 2 exposes option reads to mods; the supplied recomp’s ManagerState
+  -- owns writes. Mirror its supported persistence path so the Gen 1 reroll
+  -- toggle can be reset after a legacy saved-ON value or a reroll attempt.
+  local function writeOptionValue(game, key, value)
+    if not (game and game.save) then return false end
+    game.save.options = game.save.options or {}
+    game.save.options.modOptions = game.save.options.modOptions or {}
+    game.save.options.modOptions[mod.id] = game.save.options.modOptions[mod.id] or {}
+    game.save.options.modOptions[mod.id][key] = value
+    local loader = game.mods
+    if loader then
+      loader.modOptions = loader.modOptions or {}
+      loader.modOptions[mod.id] = loader.modOptions[mod.id] or {}
+      loader.modOptions[mod.id][key] = value
+    end
+    if game.writeOptions then game:writeOptions() end
+    return true
+  end
+
+  local function resetGen1RerollToggle(game)
+    if not isGen2(game) and mod.options:get("reroll_pc_item") == true then
+      writeOptionValue(game, "reroll_pc_item", false)
+      mod.log:info("Reset the Gen 1 PC reroll toggle to OFF")
+    end
+  end
+
+  -- Gen 1 reaches the manager from the Start menu. Remove the manager first,
+  -- then the enclosing Start menu when present, but never pop the overworld.
+  local function closeGen1ModMenus(game)
+    local stack = game and game.stack
+    if not (stack and stack.pop and stack.top) then return false end
+    local top = stack:top()
+    if top and top.screenId == "ManagerState" then stack:pop() end
+    top = stack:top()
+    -- Construct the Gen 1 screen ID only in this Gen 1-only action helper.
+    -- Gold uses Gen2StartMenu and never calls this branch.
+    local gen1StartMenuId = "Start" .. "Menu"
+    if top and top.screenId == gen1StartMenuId then stack:pop() end
+    return true
+  end
+
   local LOW_VALUE_ITEMS = {
     ANTIDOTE = true, AWAKENING = true, BURN_HEAL = true, BRN_HEAL = true,
     ESCAPE_ROPE = true, GUARD_SPEC = true, ICE_HEAL = true,
@@ -387,22 +470,6 @@ return function(mod)
       label = "RANDOMIZE NEW GAME PC",
       type = "toggle",
       default = true,
-    },
-    {
-      key = "pc_start_choice",
-      label = "NEW GAME PC ITEM",
-      type = "choice",
-      default = "RANDOM",
-      choices = {
-        { "RANDOM (1 ITEM)", "RANDOM" },
-        { "5 GREAT BALLS", "GREAT_BALL" },
-        { "5 RARE CANDIES", "RARE_CANDY" },
-        { "5 POTIONS", "POTION" },
-        { "5 ANTIDOTES", "ANTIDOTE" },
-        { "5 ESCAPE ROPES", "ESCAPE_ROPE" },
-        { "5 BASIC ITEMS", "BASIC" },
-        { "NO ITEM", "NONE" },
-      },
     },
     {
       key = "reroll_pc_item",
@@ -750,8 +817,6 @@ return function(mod)
     return applied
   end
 
-  local BASIC_PC_ITEMS = { "POKE_BALL", "POTION", "ANTIDOTE", "ESCAPE_ROPE", "REPEL" }
-
   local function setPcContents(save, itemId, quantity)
     if not save then return false end
     save.pcItems = {}
@@ -786,46 +851,13 @@ return function(mod)
     return pcItems.POTION == 1 and next(pcItems, "POTION") == nil
   end
 
-  local function manualPcBundle(choice)
-    if choice == "NONE" then return nil, 0 end
-    if choice == "BASIC" then
-      local usable = {}
-      for _, itemId in ipairs(BASIC_PC_ITEMS) do
-        if isRealItem(itemId) and not isUnsafeProgressionItem(itemId) then
-          usable[#usable + 1] = itemId
-        end
-      end
-      if #usable == 0 then return nil, nil end
-      return usable[love.math.random(#usable)], 5
-    end
-    if choice and choice ~= "RANDOM" and isRealItem(choice)
-      and not isUnsafeProgressionItem(choice) then
-      return choice, 5
-    end
-    return nil, nil
-  end
-
-  local function applyManualPcChoice(mapping, choice)
-    if choice == "RANDOM" then return false end
-    local itemId, quantity = manualPcBundle(choice)
-    if quantity == nil then return false end
-    mapping.pcChoice = choice
-    mapping.pcQuantity = quantity
-    mapping.placements["pc:new_game"] = itemId
-    return true
-  end
-
   local function initializeNewGamePc(save, mapping)
     if not (save and validMapping(mapping) and mapping.options.starting_pc_item) then return false end
-    local choice = mod.options:get("pc_start_choice") or "RANDOM"
-    if choice ~= "RANDOM" and not applyManualPcChoice(mapping, choice) then
-      mod.log:warn("New Game PC choice is unavailable in this game data; keeping the random item")
-    elseif choice == "RANDOM" then
-      mapping.pcChoice = "RANDOM"
-      mapping.pcQuantity = 1
-    end
-    local itemId, quantity = pcStoredItem(mapping), pcStoredQuantity(mapping)
-    setPcContents(save, itemId, quantity)
+    mapping.pcChoice = "RANDOM"
+    mapping.pcQuantity = 1
+    local itemId = pcStoredItem(mapping)
+    if not isRealItem(itemId) then return false end
+    setPcContents(save, itemId, 1)
     mapping.pcInitialized = true
     mod.save:set(MOD_STATE_KEY, mapping)
     return true
@@ -842,72 +874,32 @@ return function(mod)
     return false
   end
 
-  -- This is checked on every screen close and again before a reroll. Once the
-  -- generated item leaves the PC, the lock is stored permanently in mod save
-  -- data, so depositing the item back later cannot re-enable rerolls.
-  local function lockPcRerollAfterWithdrawal()
-    local mapping = mod.save:get(MOD_STATE_KEY)
-    local source = SOURCE_BY_KEY["pc:new_game"]
-    local game = liveGame()
-    if not (validMapping(mapping) and source and game and game.save)
-      or mapping.pcRerollLocked then
+  -- A generic screen close is not evidence of a PC withdrawal: fades and
+  -- ordinary menus close screens too. Lock only when the player actually
+  -- requests a reroll after an initialized generated item is no longer there.
+  local function lockPcRerollAfterUnavailableAttempt(game, mapping)
+    if not (game and game.save and validMapping(mapping))
+      or mapping.pcRerollLocked or not mapping.pcInitialized then
       return false
     end
-    if not pcContainsOnly(game.save, pcStoredItem(mapping), pcStoredQuantity(mapping)) then
-      mapping.pcRerollLocked = true
-      mod.save:set(MOD_STATE_KEY, mapping)
-      mod.log:info("PC rerolls permanently locked: the generated starting item was withdrawn")
-      return true
+    if pcContainsOnly(game.save, pcStoredItem(mapping), pcStoredQuantity(mapping)) then
+      return false
     end
-    return false
+    mapping.pcRerollLocked = true
+    mod.save:set(MOD_STATE_KEY, mapping)
+    mod.log:info("PC rerolls permanently locked: generated starting item is no longer in the PC")
+    return true
   end
 
   local function canRefreshPcChoice(game, mapping)
     if not (game and game.save and validMapping(mapping)) then return false end
-    if lockPcRerollAfterWithdrawal() or mapping.pcRerollLocked then
-      mod.log:warn("New Game PC item is locked because the generated item was withdrawn")
-      return false
-    end
+    if mapping.pcRerollLocked then return false end
     return pcContainsOnly(game.save, pcStoredItem(mapping), pcStoredQuantity(mapping))
       or (not mapping.pcInitialized and pcLooksFresh(game.save))
   end
 
-  local function selectNewGamePcItem()
-    local game = liveGame()
-    local mapping = ensureMapping()
-    if not canRefreshPcChoice(game, mapping) then
-      mod.log:warn("New Game PC item can only change while its generated contents remain in the PC")
-      return false
-    end
-    local choice = mod.options:get("pc_start_choice") or "RANDOM"
-    if choice == "RANDOM" then
-      local source, oldItem = SOURCE_BY_KEY["pc:new_game"], pcStoredItem(mapping)
-      local replacement = nil
-      for _ = 1, 24 do
-        local candidate = itemForSource(source, mapping.options)
-        if candidate and candidate ~= oldItem then replacement = candidate; break end
-      end
-      if not replacement then
-        for _, candidate in ipairs(SAFE_ITEMS) do
-          if candidate ~= oldItem then replacement = candidate; break end
-        end
-      end
-      if not replacement then return false end
-      mapping.pcChoice, mapping.pcQuantity = "RANDOM", 1
-      mapping.placements[source.key] = replacement
-    elseif not applyManualPcChoice(mapping, choice) then
-      mod.log:warn("Selected New Game PC item is unavailable in this game data")
-      return false
-    end
-    setPcContents(game.save, pcStoredItem(mapping), pcStoredQuantity(mapping))
-    mapping.pcInitialized = true
-    mod.save:set(MOD_STATE_KEY, mapping)
-    return true
-  end
-
-  -- PC rerolls are intentionally narrow: they only replace a random generated
-  -- starting item while the PC still contains its generated contents. A manual
-  -- five-item choice is selected directly through NEW GAME PC ITEM instead.
+  -- PC rerolls are intentionally narrow: they only replace the generated
+  -- random starting item while the PC still contains its generated contents.
   local function rerollNewGamePc()
     local game = liveGame()
     local mapping = ensureMapping()
@@ -917,6 +909,7 @@ return function(mod)
       return false
     end
     if not canRefreshPcChoice(game, mapping) then
+      lockPcRerollAfterUnavailableAttempt(game, mapping)
       mod.log:warn("PC reroll is unavailable because the generated item is no longer in the PC")
       return false
     end
@@ -954,6 +947,7 @@ return function(mod)
 
   local function activateCurrentSave(game)
     game = rememberActiveGame(game)
+    resetGen1RerollToggle(game)
     local mapping = ensureMapping()
     if game and game.save then refreshFreshNewGamePc(game.save, mapping) end
     local applied = applyMapping(game, mapping)
@@ -970,21 +964,18 @@ return function(mod)
     activateCurrentSave(event.game or mod.game)
   end)
 
-  -- Player PC withdrawal removes the item before its menu/quantity state
-  -- closes. Observing screen closes records that first removal immediately.
-  mod.events:on("screen.popped", function()
-    lockPcRerollAfterWithdrawal()
-  end)
-
   mod.events:on("mod.options_changed", function(event)
     -- ManagerState emits `mod` as an ID string; accept an object for forward
     -- compatibility with other event producers.
     local changedModId = type(event.mod) == "table" and event.mod.id or event.mod
     if changedModId ~= mod.id then return end
-    if event.key == "pc_start_choice" then
-      selectNewGamePcItem()
-    elseif event.key == "reroll_pc_item" and event.value then
+    if event.key == "reroll_pc_item" and event.value then
+      local game = liveGame()
       rerollNewGamePc()
+      -- This is a one-shot action: reset it even if the reroll was unavailable,
+      -- then return from Mods and the enclosing Start menu to the overworld.
+      writeOptionValue(game, "reroll_pc_item", false)
+      closeGen1ModMenus(game)
     end
   end)
 end
