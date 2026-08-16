@@ -426,6 +426,12 @@ return function(mod)
       default = true,
     },
     {
+      key = "gift_items",
+      label = "RANDOMIZE STORY ITEM GIFTS",
+      type = "toggle",
+      default = true,
+    },
+    {
       key = "starting_pc_item",
       label = "RANDOMIZE NEW GAME PC",
       type = "toggle",
@@ -445,6 +451,7 @@ return function(mod)
       progression_weighted_loot = mod.options:get("progression_weighted_loot") and true or false,
       overworld_items = mod.options:get("overworld_items") and true or false,
       itemfinder_items = mod.options:get("itemfinder_items") and true or false,
+      gift_items = mod.options:get("gift_items") and true or false,
       starting_pc_item = mod.options:get("starting_pc_item") and true or false,
     }
   end
@@ -455,6 +462,7 @@ return function(mod)
       progression_weighted_loot = options.progression_weighted_loot and true or false,
       overworld_items = options.overworld_items and true or false,
       itemfinder_items = options.itemfinder_items and true or false,
+      gift_items = options.gift_items ~= false,
       starting_pc_item = options.starting_pc_item and true or false,
     }
   end
@@ -465,6 +473,7 @@ return function(mod)
       and a.progression_weighted_loot == b.progression_weighted_loot
       and a.overworld_items == b.overworld_items
       and a.itemfinder_items == b.itemfinder_items
+      and a.gift_items == b.gift_items
       and a.starting_pc_item == b.starting_pc_item
   end
 
@@ -666,6 +675,7 @@ return function(mod)
       placements = placements,
       pcRerolls = 0,
       pcRerollLocked = false,
+      gifts = {},
     }
   end
 
@@ -701,6 +711,62 @@ return function(mod)
       #selectedSources(currentOptions))
     return mapping
   end
+
+  local ROUTE1_POTION_GIFT = {
+    key = "gift:route_1:potion_sample",
+    kind = "gift",
+    mapId = "ROUTE_1",
+    original = "POTION",
+  }
+
+  local function route1PotionGift(game, ow, npc, done)
+    local mapping = ensureMapping()
+    local options = copyOptions(mapping.options or optionSnapshot())
+    local itemId = "POTION"
+    if options.gift_items then
+      itemId = mapping.gifts and mapping.gifts[ROUTE1_POTION_GIFT.key]
+      if not isRealItem(itemId) or isUnsafeProgressionItem(itemId) then
+        itemId = itemForSource(ROUTE1_POTION_GIFT, options)
+        mapping.gifts = mapping.gifts or {}
+        mapping.gifts[ROUTE1_POTION_GIFT.key] = itemId
+        mod.save:set(MOD_STATE_KEY, mapping)
+      end
+    end
+
+    local t = game and game.data and game.data.text or {}
+    local itemDef = game and game.data and game.data.items and game.data.items[itemId]
+    local itemName = itemDef and itemDef.name or itemId
+    local playerName = game and game.save and game.save.player and game.save.player.name or ""
+    local function fillText(label, fallback)
+      local value = t[label] or fallback
+      value = value:gsub("{PLAYER}", playerName)
+      value = value:gsub("{RAM:[^}]*}", itemName)
+      return value
+    end
+    local function show(label, fallback, callback)
+      local TextBox = require("src.render.TextBox")
+      game.stack:push(TextBox.new(game, fillText(label, fallback), callback))
+    end
+    local flags = game.save.flags or {}
+    if flags.EVENT_GOT_POTION_SAMPLE then
+      show("_Route1Youngster1AlsoGotPokeballsText", "It's a useful item, isn't it?", done)
+      return
+    end
+    local Bag = require("src.inventory.Bag")
+    if not Bag.add(game.save, itemId, 1) then
+      show("_Route1Youngster1NoRoomText", "You have no room for this item!", done)
+      return
+    end
+    flags.EVENT_GOT_POTION_SAMPLE = true
+    show("_Route1Youngster1GotPotionText", "{PLAYER} received\\n{RAM:}!", done)
+  end
+
+  mod.content.map_scripts:register("ROUTE_1", {
+    priority = 120,
+    talk = {
+      TEXT_ROUTE1_YOUNGSTER1 = route1PotionGift,
+    },
+  })
 
   local function findVisible(data, source)
     local map = data.maps and data.maps[source.mapId]

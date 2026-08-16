@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.7 — Route 1 Story Gift
+
+The Gen 1 Item Randomizer now includes the early Route 1 Potion-sample reward in **RANDOMIZE STORY ITEM GIFTS**. The source is the one-time `TEXT_ROUTE1_YOUNGSTER1` reward guarded by `EVENT_GOT_POTION_SAMPLE`, not an overworld ball or Itemfinder pickup, so it was previously outside the randomizer’s source catalog.
+
+The replacement is generated once per save through the existing progression-weighted safe-item system. Key items, HMs, and other unsafe progression records remain excluded, while the early-game weighting still allows a small chance of a stronger reward. Turning the new option off leaves the native Potion gift unchanged. Gen 2 behavior is unchanged.
+
 ## 1.0.6 — Gen 1 Reroll Event Restoration
 
 This patch restores the direct PC-reroll event sequence from the first confirmed working implementation. Later builds attempted to clear the option and close the mod menu from inside the same synchronous option-change event. That extra manager-state mutation was not part of the proven action path and could prevent the reroll from completing in the live menu.

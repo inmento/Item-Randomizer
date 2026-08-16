@@ -2,6 +2,15 @@ local callbacks = { events = {}, hooks = {} }
 package.preload["src.core.GameVersion"] = function()
   return { get = function() return "red" end }
 end
+package.preload["src.render.TextBox"] = function()
+  return { new = function(_, _, _, done) return { done = done } end }
+end
+package.preload["src.inventory.Bag"] = function()
+  return { add = function(save, item, quantity)
+    save.inventory[item] = (save.inventory[item] or 0) + quantity
+    return true
+  end }
+end
 local store = {}
 local optionValues = {
   lesser_bad_items = true,
@@ -9,6 +18,7 @@ local optionValues = {
   overworld_items = true,
   itemfinder_items = true,
   starting_pc_item = true,
+  gift_items = true,
   reroll_pc_item = false,
 }
 
@@ -43,6 +53,12 @@ local mod = {
     maps = { each = function() return pairs(maps) end },
     field = { get = function(_, key) if key == "hiddenItems" then return hiddenItems end end },
     items = { each = function() return pairs(itemRecords) end },
+    map_scripts = {
+      register = function(_, mapId, contribution)
+        callbacks.mapScripts = callbacks.mapScripts or {}
+        callbacks.mapScripts[mapId] = contribution
+      end,
+    },
   },
   options = {
     define = function(_, schema) callbacks.schema = schema end,
@@ -59,11 +75,21 @@ local mod = {
 
 local entry = assert(loadfile("/home/ubuntu/item_randomizer/main.lua"))
 entry()(mod)
-assert(#callbacks.schema == 6, "six safe-weighted randomizer options were not defined")
+assert(#callbacks.schema == 7, "seven safe-weighted randomizer options were not defined")
+assert(callbacks.mapScripts.ROUTE_1
+  and callbacks.mapScripts.ROUTE_1.talk.TEXT_ROUTE1_YOUNGSTER1,
+  "Route 1 Potion gift was not registered")
 
-local save = { pcItems = { POTION = 1 }, modData = {}, inventory = {} }
+itemRecords.POTION.name = "Potion"
+itemRecords.ANTIDOTE.name = "Antidote"
+itemRecords.SUPER_POTION.name = "Super Potion"
+itemRecords.RARE_CANDY.name = "Rare Candy"
+local save = {
+  pcItems = { POTION = 1 }, modData = {}, inventory = {}, flags = {},
+  player = { name = "RED" },
+}
 callbacks.hooks["save.new_game"](function(s) return s end, save)
-local game = { save = save, data = { maps = maps, field = { hiddenItems = hiddenItems } } }
+local game = { save = save, data = { maps = maps, field = { hiddenItems = hiddenItems }, items = itemRecords, text = {} }, stack = { push = function() end } }
 mod.game = game
 callbacks.events["game.ready"]({ game = game })
 
@@ -75,6 +101,15 @@ end
 assert(maps.VIRIDIAN_FOREST.objects[2].item == "BICYCLE", "key-item source was changed")
 assert(maps.VIRIDIAN_FOREST.objects[3].item == "HM_01", "HM source was changed")
 assert(next(save.pcItems) ~= nil, "New Game PC item was not initialized")
+local giftDone = false
+callbacks.mapScripts.ROUTE_1.talk.TEXT_ROUTE1_YOUNGSTER1(
+  game, {}, {}, function() giftDone = true end)
+local giftMapping = store.item_mapping
+local giftItem = giftMapping.gifts and giftMapping.gifts["gift:route_1:potion_sample"]
+assert(giftItem == "RARE_CANDY" or giftItem == "SUPER_POTION" or giftItem == "POTION"
+  or giftItem == "ANTIDOTE", "Route 1 reward was not assigned a safe weighted item")
+assert(save.inventory[giftItem] == 1, "Route 1 reward was not added to the bag")
+assert(save.flags.EVENT_GOT_POTION_SAMPLE == true, "Route 1 reward flag was not set")
 
 local oldPcItem = mapping.placements["pc:new_game"]
 -- The mod API resolves mod.game lazily. A transient nil during the options
