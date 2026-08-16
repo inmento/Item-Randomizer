@@ -1,7 +1,7 @@
 {
   "id": "item_randomizer",
   "name": "Item Randomizer",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "entry": "main.lua",
   "api": 2,
   "category": "GAMEPLAY",
@@ -9,5 +9,6 @@
   "games": ["gen1", "gen2"],
   "affects_link": false,
   "github": "inmento/Item-Randomizer",
+  "permissions": ["engine_internals"],
   "description": "Safe item randomization for map pickups, hidden finds, berries, gifts, eligible held items, and protected New Game PC choices in Gen 1 and Gold."
 }

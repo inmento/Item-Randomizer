@@ -356,6 +356,7 @@ return function(mod)
 
   local MOD_STATE_KEY = "item_mapping"
   local MAPPING_VERSION = 3
+  local PC_SEED_REVISION = 2
 
   -- `mod.game` resolves the engine singleton in a live boot, but keeping the
   -- most recent lifecycle payload makes an option action reliable during UI
@@ -859,6 +860,7 @@ return function(mod)
     if not isRealItem(itemId) then return false end
     setPcContents(save, itemId, 1)
     mapping.pcInitialized = true
+    mapping.pcSeedRevision = PC_SEED_REVISION
     mod.save:set(MOD_STATE_KEY, mapping)
     return true
   end
@@ -872,6 +874,23 @@ return function(mod)
       return initializeNewGamePc(save, mapping)
     end
     return false
+  end
+
+  -- `save.created` exposes the newly built save directly. Older builds only
+  -- looked through `mod.game`, which can still point at the previous runtime
+  -- during the New Game transition. Repair that narrow case only for a fresh,
+  -- never-rerolled PC; established storage remains untouched.
+  local function ensureFreshPcSeed(save, mapping)
+    if not (save and validMapping(mapping) and mapping.options.starting_pc_item)
+      or mapping.pcRerollLocked or not pcLooksFresh(save) then
+      return false
+    end
+    if mapping.pcSeedRevision == PC_SEED_REVISION
+      and pcContainsOnly(save, pcStoredItem(mapping), pcStoredQuantity(mapping)) then
+      return false
+    end
+    if (tonumber(mapping.pcRerolls) or 0) ~= 0 then return false end
+    return initializeNewGamePc(save, mapping)
   end
 
   -- A generic screen close is not evidence of a PC withdrawal: fades and
@@ -903,6 +922,7 @@ return function(mod)
   local function rerollNewGamePc()
     local game = liveGame()
     local mapping = ensureMapping()
+    if game and game.save then ensureFreshPcSeed(game.save, mapping) end
     local source = SOURCE_BY_KEY["pc:new_game"]
     if (mapping.pcChoice and mapping.pcChoice ~= "RANDOM") then
       mod.log:warn("Choose RANDOM (1 ITEM) before using the New Game PC reroll")
@@ -945,11 +965,15 @@ return function(mod)
     return save
   end)
 
-  local function activateCurrentSave(game)
+  local function activateCurrentSave(game, explicitSave)
     game = rememberActiveGame(game)
     resetGen1RerollToggle(game)
     local mapping = ensureMapping()
-    if game and game.save then refreshFreshNewGamePc(game.save, mapping) end
+    local save = explicitSave or (game and game.save)
+    if save then
+      ensureFreshPcSeed(save, mapping)
+      refreshFreshNewGamePc(save, mapping)
+    end
     local applied = applyMapping(game, mapping)
     mod.log:info("Applied safe item mapping to %d selected visible/hidden sources", applied)
   end
@@ -958,7 +982,7 @@ return function(mod)
     activateCurrentSave(event.game)
   end)
   mod.events:on("save.created", function(event)
-    activateCurrentSave(event.game or mod.game)
+    activateCurrentSave(event.game or mod.game, event.save)
   end)
   mod.events:on("save.loaded", function(event)
     activateCurrentSave(event.game or mod.game)

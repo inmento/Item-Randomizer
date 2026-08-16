@@ -1,4 +1,7 @@
 local callbacks = { events = {}, hooks = {} }
+package.preload["src.core.GameVersion"] = function()
+  return { get = function() return "red" end }
+end
 local store = {}
 local optionValues = {
   lesser_bad_items = true,
@@ -87,11 +90,20 @@ assert(newPcItem ~= oldPcItem, "PC reroll returned the same item and appeared to
 assert(save.pcItems[newPcItem] == 1, "PC reroll did not replace the generated starting item")
 assert(newPcItem ~= "BICYCLE" and newPcItem ~= "HM_01", "PC reroll produced an unsafe item")
 
--- Withdrawing the generated item locks rerolls when the PC screen closes.
-save.pcItems[newPcItem] = nil
-callbacks.events["screen.popped"]({ state = { kind = "pc_item_withdraw" } })
+-- An ordinary screen close is not a withdrawal. The patch deliberately does
+-- not subscribe a broad screen-close lock handler at all.
+assert(callbacks.events["screen.popped"] == nil,
+  "an unrelated screen-close handler can lock the PC reroll")
 mapping = store.item_mapping
-assert(mapping.pcRerollLocked == true, "withdrawing the starting item did not permanently lock rerolls")
+assert(mapping.pcRerollLocked ~= true, "the PC reroll was locked before withdrawal")
+
+-- Withdrawing the generated item locks rerolls only when a reroll is attempted.
+save.pcItems[newPcItem] = nil
+callbacks.events["mod.options_changed"]({
+  mod = "item_randomizer", key = "reroll_pc_item", value = true,
+})
+mapping = store.item_mapping
+assert(mapping.pcRerollLocked == true, "an unavailable reroll after withdrawal did not permanently lock")
 
 -- Depositing the item back later cannot reopen the feature.
 save.pcItems[newPcItem] = 1

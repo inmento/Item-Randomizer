@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.5 — Gen 1 PC Seeding Hotfix
+
+This patch fixes the remaining Gen 1 PC reroll failure. The previous build could receive a fresh-save lifecycle event while its live game reference still pointed at an earlier runtime, leaving the native PC Potion in place even though the mapping existed. The reroll correctly refused to replace a PC that did not contain its generated item, which made the toggle appear nonfunctional.
+
+The new build seeds the generated PC item through the explicit fresh-save payload, repairs only untouched empty/native-Potion PCs from affected saves, and leaves established PC storage alone. The reroll action still resets itself to OFF and remains permanently locked only after the generated item has truly been removed from the PC.
+
 ## 1.0.4 — Gen 1 Reroll Hotfix and Gen 2 Stability
 
 Gen 1 **REROLL NEW GAME PC ITEM** now reliably performs its one-shot action: it changes the still-stored generated PC item, writes the toggle back to OFF, and returns from Mods and the Start menu to the overworld. The reroll is no longer permanently disabled by an unrelated fade or screen close before the fresh PC item has been initialized. A permanent lock is recorded only when a player deliberately attempts a reroll after the initialized generated contents have left the PC.
