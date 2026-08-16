@@ -374,47 +374,6 @@ return function(mod)
     return activeGame
   end
 
-  -- Mod API 2 exposes option reads to mods; the supplied recomp’s ManagerState
-  -- owns writes. Mirror its supported persistence path so the Gen 1 reroll
-  -- toggle can be reset after a legacy saved-ON value or a reroll attempt.
-  local function writeOptionValue(game, key, value)
-    if not (game and game.save) then return false end
-    game.save.options = game.save.options or {}
-    game.save.options.modOptions = game.save.options.modOptions or {}
-    game.save.options.modOptions[mod.id] = game.save.options.modOptions[mod.id] or {}
-    game.save.options.modOptions[mod.id][key] = value
-    local loader = game.mods
-    if loader then
-      loader.modOptions = loader.modOptions or {}
-      loader.modOptions[mod.id] = loader.modOptions[mod.id] or {}
-      loader.modOptions[mod.id][key] = value
-    end
-    if game.writeOptions then game:writeOptions() end
-    return true
-  end
-
-  local function resetGen1RerollToggle(game)
-    if not isGen2(game) and mod.options:get("reroll_pc_item") == true then
-      writeOptionValue(game, "reroll_pc_item", false)
-      mod.log:info("Reset the Gen 1 PC reroll toggle to OFF")
-    end
-  end
-
-  -- Gen 1 reaches the manager from the Start menu. Remove the manager first,
-  -- then the enclosing Start menu when present, but never pop the overworld.
-  local function closeGen1ModMenus(game)
-    local stack = game and game.stack
-    if not (stack and stack.pop and stack.top) then return false end
-    local top = stack:top()
-    if top and top.screenId == "ManagerState" then stack:pop() end
-    top = stack:top()
-    -- Construct the Gen 1 screen ID only in this Gen 1-only action helper.
-    -- Gold uses Gen2StartMenu and never calls this branch.
-    local gen1StartMenuId = "Start" .. "Menu"
-    if top and top.screenId == gen1StartMenuId then stack:pop() end
-    return true
-  end
-
   local LOW_VALUE_ITEMS = {
     ANTIDOTE = true, AWAKENING = true, BURN_HEAL = true, BRN_HEAL = true,
     ESCAPE_ROPE = true, GUARD_SPEC = true, ICE_HEAL = true,
@@ -967,7 +926,6 @@ return function(mod)
 
   local function activateCurrentSave(game, explicitSave)
     game = rememberActiveGame(game)
-    resetGen1RerollToggle(game)
     local mapping = ensureMapping()
     local save = explicitSave or (game and game.save)
     if save then
@@ -994,12 +952,10 @@ return function(mod)
     local changedModId = type(event.mod) == "table" and event.mod.id or event.mod
     if changedModId ~= mod.id then return end
     if event.key == "reroll_pc_item" and event.value then
-      local game = liveGame()
+      -- Keep the manager event side-effect free. The first proven working
+      -- build performed only the reroll here; writing option state or popping
+      -- menu screens during this synchronous event can interrupt the action.
       rerollNewGamePc()
-      -- This is a one-shot action: reset it even if the reroll was unavailable,
-      -- then return from Mods and the enclosing Start menu to the overworld.
-      writeOptionValue(game, "reroll_pc_item", false)
-      closeGen1ModMenus(game)
     end
   end)
 end

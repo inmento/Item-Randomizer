@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.6 — Gen 1 Reroll Event Restoration
+
+This patch restores the direct PC-reroll event sequence from the first confirmed working implementation. Later builds attempted to clear the option and close the mod menu from inside the same synchronous option-change event. That extra manager-state mutation was not part of the proven action path and could prevent the reroll from completing in the live menu.
+
+The Gen 1 action now performs only the safe PC replacement during its option-change event. After each reroll, turn the toggle back Off and then On again for another reroll. The fresh-PC seeding repair from 1.0.5, safe-item filtering, and withdrawal lock remain in place.
+
 ## 1.0.5 — Gen 1 PC Seeding Hotfix
 
 This patch fixes the remaining Gen 1 PC reroll failure. The previous build could receive a fresh-save lifecycle event while its live game reference still pointed at an earlier runtime, leaving the native PC Potion in place even though the mapping existed. The reroll correctly refused to replace a PC that did not contain its generated item, which made the toggle appear nonfunctional.
