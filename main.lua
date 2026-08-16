@@ -15,6 +15,15 @@ return function(mod)
     return playing == "gold"
   end
 
+  -- Crystal 251 is optional. The integration path reads only the merged live
+  -- registries and never makes the overhaul a dependency for ordinary runs.
+  local function crystal251Active()
+    if isGen2() or type(mod.find) ~= "function" then return false end
+    local ok, handle = pcall(mod.find, mod, "CRYSTAL_251")
+    local exports = ok and type(handle) == "table" and handle.exports or nil
+    return type(exports) == "table" and tonumber(exports.dexSize) == 251
+  end
+
   if isGen2() then
     local STATE_KEY = "gold_item_mapping"
     local VERSION = 1
@@ -29,6 +38,12 @@ return function(mod)
       { key = "gold_berry_trees", label = "GOLD BERRY TREES", type = "toggle", default = false },
       { key = "gold_gift_items", label = "GOLD GIFT ITEMS", type = "toggle", default = false },
       { key = "gold_held_items", label = "GOLD HELD ITEMS", type = "toggle", default = false },
+      { key = "gold_held_item_mode", label = "GOLD HELD ITEM MODE", type = "choice", default = "SAFE_ANY",
+        choices = {
+          { "SAFE HELD ITEMS", "SAFE_ANY" },
+          { "USEFUL HELD ITEMS", "USEFUL" },
+          { "NO HELD ITEMS", "NONE" },
+        } },
       { key = "gold_shop_items", label = "GOLD RANDOMIZE SHOPS", type = "toggle", default = false },
       { key = "gold_pc_item", label = "GOLD START PC", type = "toggle", default = false },
       { key = "pc_start_choice", label = "GOLD PC ITEM", type = "choice", default = "RANDOM",
@@ -43,6 +58,8 @@ return function(mod)
           { "NO ITEM", "NONE" },
         } },
       { key = "gold_reroll_pc", label = "GOLD REROLL PC", type = "toggle", default = false },
+      { key = "gold_shop_preview", label = "GOLD SHOP PREVIEW", type = "toggle", default = false },
+      { key = "gold_pc_status", label = "GOLD PC REROLL STATUS", type = "toggle", default = false },
     })
 
     local function mapsOf(game)
@@ -68,7 +85,7 @@ return function(mod)
       local item = game and game.data and game.data.items and game.data.items[itemId]
       if type(item) ~= "table" then return false end
       if item.keyItem or item.canToss == false or item.tossable == false then return false end
-      if item.pocket == "KEY_ITEM" then return false end
+      if item.isMail or item.mail or item.pocket == "KEY_ITEM" then return false end
       if tostring(itemId):match("^HM_") then return false end
       if type(item.machine) == "table" and item.machine.kind == "HM" then return false end
       return item.index ~= nil
@@ -336,11 +353,28 @@ return function(mod)
     end
 
     local function heldItemFor(game, current, key)
+      local mode = mod.options:get("gold_held_item_mode") or "SAFE_ANY"
+      if mode == "NONE" then return nil end
       local item = current.held[key]
-      if safeItem(game, item) then return item end
-      item = randomFrom(safeItemPool(game))
-      current.held[key] = item
-      mod.save:set(STATE_KEY, current)
+      local live = game and game.data and game.data.items and game.data.items[item]
+      if safeItem(game, item) and live and live.heldEffect and live.heldEffect ~= "HELD_NONE" then
+        return item
+      end
+      local pool = {}
+      for _, candidate in ipairs(safeItemPool(game)) do
+        local def = game and game.data and game.data.items and game.data.items[candidate]
+        local useful = not GOLD_SHOP_JUNK[candidate]
+          and (tonumber(def and def.price) or 0) >= 100
+        if def and def.heldEffect and def.heldEffect ~= "HELD_NONE"
+          and (mode ~= "USEFUL" or useful) then
+          pool[#pool + 1] = candidate
+        end
+      end
+      item = randomFrom(pool)
+      if item then
+        current.held[key] = item
+        mod.save:set(STATE_KEY, current)
+      end
       return item
     end
 
@@ -436,10 +470,72 @@ return function(mod)
     mod.events:on("save.loaded", function(event) applyMapSources((event and event.game) or mod.game) end)
     mod.events:on("screen.popped", function() lockPc(mod.game) end)
 
+    local function resetGoldAction(key)
+      local game = mod.game
+      local stores = {
+        game and game.mods and game.mods.modOptions,
+        game and game.save and game.save.options and game.save.options.modOptions,
+      }
+      for _, store in ipairs(stores) do
+        local bucket = store and store[mod.id]
+        if bucket then bucket[key] = false end
+      end
+    end
+
+    local function showGoldDiagnostic(game, text)
+      local TextBox = require("src.render.TextBox")
+      if game and game.stack then game.stack:push(TextBox.new(game, text)) end
+    end
+
+    local function goldShopPreview(game)
+      local current, pages = mapping(game), {}
+      for key, shop in pairs((current and current.shops) or {}) do
+        if type(shop) == "table" and type(shop.stock) == "table" then
+          local rows = { "SHOP " .. tostring(key) }
+          for index, itemId in ipairs(shop.stock) do
+            local item = game and game.data and game.data.items and game.data.items[itemId] or {}
+            rows[#rows + 1] = string.format("%d. %s %d", index, item.name or itemId,
+              math.max(0, math.floor(tonumber(shop.prices and shop.prices[index]) or 0)))
+          end
+          pages[#pages + 1] = table.concat(rows, "\n")
+        end
+      end
+      table.sort(pages)
+      showGoldDiagnostic(game, #pages > 0 and table.concat(pages, "\f")
+        or "NO RANDOMIZED\nSHOPS YET")
+    end
+
+    local function goldPcStatus(game)
+      local current = mapping(game)
+      local status
+      if not mod.options:get("gold_pc_item") then
+        status = "START PC ITEM\nDISABLED"
+      elseif not current.pcPlaced then
+        status = "START PC ITEM\nWAITING FOR NEW GAME"
+      elseif current.pcLocked then
+        status = "PC REROLL\nLOCKED AFTER WITHDRAWAL"
+      elseif pcStillContains(game and game.save, current.placements["pc:new"], current.pcQuantity) then
+        status = string.format("PC REROLL READY\n%s x%d", tostring(current.placements["pc:new"]),
+          math.max(0, math.floor(tonumber(current.pcQuantity) or 0)))
+      else
+        status = "PC REROLL\nUNAVAILABLE"
+      end
+      showGoldDiagnostic(game, status)
+    end
+
     mod.events:on("mod.options_changed", function(event)
       local changed = type(event and event.mod) == "table" and event.mod.id or event and event.mod
       if changed ~= mod.id then return end
-      if event.key == "gold_reroll_pc" and event.value then rerollPc(mod.game) end
+      if event.key == "gold_reroll_pc" and event.value then
+        resetGoldAction(event.key)
+        rerollPc(mod.game)
+      elseif event.key == "gold_shop_preview" and event.value then
+        resetGoldAction(event.key)
+        goldShopPreview(mod.game)
+      elseif event.key == "gold_pc_status" and event.value then
+        resetGoldAction(event.key)
+        goldPcStatus(mod.game)
+      end
       if event.key == "gold_ball_items" or event.key == "gold_finder_items" then applyMapSources(mod.game) end
       if event.key == "gold_shop_items" and event.value ~= true then restoreGoldShopPrices(mod.game) end
     end)
@@ -586,6 +682,18 @@ return function(mod)
       type = "toggle",
       default = false,
     },
+    {
+      key = "shop_preview",
+      label = "OPEN SHOP PREVIEW",
+      type = "toggle",
+      default = false,
+    },
+    {
+      key = "pc_reroll_status",
+      label = "PC REROLL STATUS",
+      type = "toggle",
+      default = false,
+    },
   })
 
   local function optionSnapshot()
@@ -660,32 +768,47 @@ return function(mod)
     return sources
   end
 
-  local SOURCES = collectSources()
-  local SOURCE_BY_KEY = {}
-  for _, source in ipairs(SOURCES) do SOURCE_BY_KEY[source.key] = source end
+  local SOURCES, SOURCE_BY_KEY, ITEM_INFO, SAFE_ITEMS = {}, {}, {}, {}
 
-  local ITEM_INFO = {}
-  for itemId, item in mod.content.items:each() do ITEM_INFO[itemId] = item end
+  -- Crystal 251 introduces mail, machine items, and evolution/progression
+  -- items to the live Gen 1 registry. The ordinary randomizer remains usable
+  -- without it, while an active Crystal import simply extends these filters.
+  local CRYSTAL_PROGRESSION_ITEMS = {
+    KINGS_ROCK=true, METAL_COAT=true, DRAGON_SCALE=true, SUN_STONE=true,
+    UP_GRADE=true,
+  }
 
-  -- Key items, HMs, and non-tossable records are progression-critical or
-  -- otherwise unsuitable as random rewards. Keep their original sources and
-  -- exclude them from every generated item pool.
+  -- Key items, HMs, mail, non-tossable records, and Crystal's single-player
+  -- evolution/progression items stay out of generated pools. Keep their
+  -- original locations so neither story flow nor item-based evolution access
+  -- is disturbed.
   local function isUnsafeProgressionItem(itemId)
     local item = ITEM_INFO[itemId]
     if not item then return true end
-    if item.keyItem or item.tossable == false then return true end
+    if item.keyItem or item.tossable == false or item.canToss == false then return true end
+    if item.isMail or item.mail or item.pocket == "KEY_ITEM" then return true end
     if itemId:match("^HM_") then return true end
     if type(item.machine) == "table" and item.machine.kind == "HM" then return true end
+    if crystal251Active() and CRYSTAL_PROGRESSION_ITEMS[itemId] then return true end
     return false
   end
 
-  local SAFE_ITEMS = {}
-  for itemId, _ in pairs(ITEM_INFO) do
-    if isRealItem(itemId) and not isUnsafeProgressionItem(itemId) then
-      SAFE_ITEMS[#SAFE_ITEMS + 1] = itemId
+  local function rebuildContentViews()
+    SOURCES = collectSources()
+    SOURCE_BY_KEY = {}
+    for _, source in ipairs(SOURCES) do SOURCE_BY_KEY[source.key] = source end
+    ITEM_INFO = {}
+    for itemId, item in mod.content.items:each() do ITEM_INFO[itemId] = item end
+    SAFE_ITEMS = {}
+    for itemId, _ in pairs(ITEM_INFO) do
+      if isRealItem(itemId) and not isUnsafeProgressionItem(itemId) then
+        SAFE_ITEMS[#SAFE_ITEMS + 1] = itemId
+      end
     end
+    table.sort(SAFE_ITEMS)
   end
-  table.sort(SAFE_ITEMS)
+
+  rebuildContentViews()
 
   local function sourceEnabled(source, options)
     if source.kind == "visible" then return options.overworld_items end
@@ -767,7 +890,7 @@ return function(mod)
     { 6, 10, 14, 11, 8 },
   }
 
-  local function weightedSafeItem(source, options)
+  local function weightedSafeItem(source, options, recent)
     local tierWeights = QUALITY_WEIGHTS[sourceProgressTier(source)]
     local total = 0
     local entries = {}
@@ -776,6 +899,10 @@ return function(mod)
       if options.lesser_bad_items and LOW_VALUE_ITEMS[itemId] then
         weight = math.max(1, math.floor(weight / 4))
       end
+      -- A soft penalty discourages one area from becoming a stack of the same
+      -- reward without making any safe outcome impossible.
+      local repeats = recent and (recent[itemId] or 0) or 0
+      if repeats > 0 then weight = math.max(1, math.floor(weight / (1 + repeats * 3))) end
       total = total + weight
       entries[#entries + 1] = { itemId = itemId, limit = total }
     end
@@ -788,9 +915,9 @@ return function(mod)
     return entries[#entries].itemId
   end
 
-  local function itemForSource(source, options)
+  local function itemForSource(source, options, recent)
     if options.progression_weighted_loot then
-      return weightedSafeItem(source, options)
+      return weightedSafeItem(source, options, recent)
     end
     return SAFE_ITEMS[love.math.random(#SAFE_ITEMS)]
   end
@@ -946,8 +1073,14 @@ return function(mod)
     local placements = {}
 
     if options.progression_weighted_loot then
+      local recentByArea = {}
       for _, source in ipairs(selected) do
-        placements[source.key] = itemForSource(source, options)
+        local area = source.mapId or source.kind
+        local recent = recentByArea[area] or {}
+        local itemId = itemForSource(source, options, recent)
+        placements[source.key] = itemId
+        if itemId then recent[itemId] = (recent[itemId] or 0) + 1 end
+        recentByArea[area] = recent
       end
     else
       -- Non-weighted mode preserves the original source-item permutation,
@@ -1291,6 +1424,59 @@ return function(mod)
     return save
   end)
 
+  local function resetGen1Action(key)
+    local game = liveGame()
+    local stores = {
+      game and game.mods and game.mods.modOptions,
+      game and game.save and game.save.options and game.save.options.modOptions,
+    }
+    for _, store in ipairs(stores) do
+      local bucket = store and store[mod.id]
+      if bucket then bucket[key] = false end
+    end
+  end
+
+  local function showGen1Diagnostic(game, text)
+    local TextBox = require("src.render.TextBox")
+    if game and game.stack then game.stack:push(TextBox.new(game, text)) end
+  end
+
+  local function gen1ShopPreview(game)
+    local mapping, pages = ensureMapping(), {}
+    for key, shop in pairs(((mapping.shops or {}).gen1) or {}) do
+      if type(shop) == "table" and type(shop.stock) == "table" then
+        local rows = { "SHOP " .. tostring(key) }
+        for index, itemId in ipairs(shop.stock) do
+          local item = ITEM_INFO[itemId] or {}
+          rows[#rows + 1] = string.format("%d. %s %d", index, item.name or itemId,
+            math.max(0, math.floor(tonumber(shop.prices and shop.prices[index]) or 0)))
+        end
+        pages[#pages + 1] = table.concat(rows, "\n")
+      end
+    end
+    table.sort(pages)
+    showGen1Diagnostic(game, #pages > 0 and table.concat(pages, "\f")
+      or "NO RANDOMIZED\nSHOPS YET")
+  end
+
+  local function gen1PcStatus(game)
+    local mapping = ensureMapping()
+    local text
+    if not mapping.options.starting_pc_item then
+      text = "NEW GAME PC\nDISABLED"
+    elseif mapping.pcRerollLocked then
+      text = "PC REROLL\nLOCKED AFTER WITHDRAWAL"
+    elseif not mapping.pcInitialized then
+      text = "PC REROLL\nWAITING FOR NEW GAME"
+    elseif pcContainsOnly(game and game.save, pcStoredItem(mapping), pcStoredQuantity(mapping)) then
+      text = string.format("PC REROLL READY\n%s x%d", tostring(pcStoredItem(mapping)),
+        pcStoredQuantity(mapping))
+    else
+      text = "PC REROLL\nUNAVAILABLE"
+    end
+    showGen1Diagnostic(game, text)
+  end
+
   local function activateCurrentSave(game, explicitSave)
     game = rememberActiveGame(game)
     local mapping = ensureMapping()
@@ -1304,6 +1490,10 @@ return function(mod)
   end
 
   mod.events:on("game.ready", function(event)
+    if crystal251Active() then
+      rebuildContentViews()
+      mod.log:info("Item Randomizer: Crystal 251 detected; filtering imported mail, machines, and progression items")
+    end
     activateCurrentSave(event.game)
   end)
   mod.events:on("save.created", function(event)
@@ -1344,10 +1534,14 @@ return function(mod)
       restoreShopPrices(liveGame())
     end
     if event.key == "reroll_pc_item" and event.value then
-      -- Keep the manager event side-effect free. The first proven working
-      -- build performed only the reroll here; writing option state or popping
-      -- menu screens during this synchronous event can interrupt the action.
+      resetGen1Action(event.key)
       rerollNewGamePc()
+    elseif event.key == "shop_preview" and event.value then
+      resetGen1Action(event.key)
+      gen1ShopPreview(liveGame())
+    elseif event.key == "pc_reroll_status" and event.value then
+      resetGen1Action(event.key)
+      gen1PcStatus(liveGame())
     end
   end)
 end

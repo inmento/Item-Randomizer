@@ -6,27 +6,29 @@ Item Randomizer creates a persistent per-save item mapping for Gen 1 and Gold. I
 
 ## Install
 
-Import the `item_randomizer-1.0.8.zip` release archive through Gen 1 Recomp’s **Import mod .zip** action. The archive extracts directly to an `item_randomizer/` folder containing `manifest.json` and `main.lua`.
+Import the `item_randomizer-1.0.9.zip` release archive through Gen 1 Recomp’s **Import mod .zip** action. The archive extracts directly to an `item_randomizer/` folder containing `manifest.json` and `main.lua`.
 
 ## Features
 
 Visible item balls, hidden Itemfinder rewards, and the optional New Game PC item can be enabled independently. Once a save receives its mapping, that mapping remains stable across map changes, saves, and reloads.
 
-**Reduced Low-Value Items** lowers the weight of common low-impact rewards. **Progression-Weighted Loot** favors modest useful items early and stronger rewards later, while always retaining a small chance of premium results. The generator is weighted rather than locked, so surprising early rewards remain possible.
+**Reduced Low-Value Items** lowers the weight of common low-impact rewards. **Progression-Weighted Loot** favors modest useful items early and stronger rewards later, while always retaining a small chance of premium results. The generator is weighted rather than locked, so surprising early rewards remain possible. A soft per-area duplicate penalty makes repeated rewards less likely without making any valid result impossible.
 
-**RANDOMIZE SHOP INVENTORIES** adds a persistent per-save layout for Gen 1 marts. Each shop receives a progression-conscious shelf of safe items and generated prices. The shelf is not rerolled by leaving, returning, saving, or reloading.
+**RANDOMIZE SHOP INVENTORIES** adds a persistent per-save layout for Gen 1 marts. Each shop receives a progression-conscious shelf of safe items and generated prices. The shelf is not rerolled by leaving, returning, saving, or reloading. **OPEN SHOP PREVIEW** is a read-only tester display of shops that have already generated a saved layout.
 
-In **Gen 1**, the New Game PC feature replaces only the generated starting PC item. If a fresh save still has its untouched native Potion or an empty PC after startup, the mod retries that placement without changing an established PC. **REROLL NEW GAME PC ITEM** is a one-shot action: it starts OFF, rerolls the generated item when enabled, immediately returns to OFF, and closes **Mods** and the Start menu back to the overworld. It permanently locks only if the player later tries to reroll after the initialized generated contents have left the PC. Gen 1 does not show the manual PC-item selector; that selector is Gold-only.
+In **Gen 1**, the New Game PC feature replaces only the generated starting PC item. If a fresh save still has its untouched native Potion or an empty PC after startup, the mod retries that placement without changing an established PC. **REROLL NEW GAME PC ITEM** is a one-shot action: it starts OFF, rerolls the generated item when enabled, immediately returns to OFF, and closes **Mods** and the Start menu back to the overworld. It permanently locks only if the player later tries to reroll after the initialized generated contents have left the PC. **PC REROLL STATUS** is a read-only display of the stored PC state, including fresh, ready, unavailable, and permanently locked conditions. Gen 1 does not show the manual PC-item selector; that selector is Gold-only.
 
 ## Gold
 
 Gold adds native support for visible item balls, hidden item records, berry trees, eligible ordinary scripted gifts, eligible existing held items, and the protected New Game PC reroll. When **GOLD START PC** is enabled, **GOLD PC ITEM** can choose a random one-item result, five Great Balls, Rare Candies, Potions, Antidotes, Escape Ropes, a basic five-item mix, or no item.
 
-Berry-tree handling preserves apricorn trees. Held-item handling affects only Pokémon that originally held an item; it does not assign an item to an itemless Pokémon. Scripted gifts use the same safe item rules as other enabled sources. **GOLD RANDOMIZE SHOPS** adds the corresponding persistent, progression-conscious randomization for standard Gold marts.
+Berry-tree handling preserves apricorn trees. Held-item handling affects only Pokémon that originally held an item; it does not assign an item to an itemless Pokémon. **GOLD HELD ITEM MODE** can use all safe effective held items, a more useful subset, or no randomized held items. Scripted gifts use the same safe item rules as other enabled sources. **GOLD RANDOMIZE SHOPS** adds the corresponding persistent, progression-conscious randomization for standard Gold marts. **GOLD SHOP PREVIEW** and **GOLD PC REROLL STATUS** provide read-only testing views of saved generated state.
 
 ## Compatibility
 
-Item Randomizer targets Mod API 2 and supports Gen 1 and Gold. It reads the engine’s active GameVersion before registering generation-specific behavior, keeping the Gen 1 and Gold option sets separate. It can be used alongside Gym Leader Shuffle and Starter Picker. See [CHANGELOG.md](CHANGELOG.md) for the complete release feature list and safety rules.
+Item Randomizer targets Mod API 2 and supports Gen 1 and Gold. It reads the engine’s active GameVersion before registering generation-specific behavior, keeping the Gen 1 and Gold option sets separate. It can be used alongside Gym Leader Shuffle and Starter Picker.
+
+**Crystal 251 is optional.** When that Red, Blue, or Yellow overhaul is active, Item Randomizer uses its merged live item registry and excludes Crystal mail, machines, HMs, key/non-tossable items, and Crystal single-player evolution/progression items from generated pools. It does not require Crystal 251 and does not modify Crystal’s item effects, progression, maps, or shops outside its enabled randomized projections. See [CHANGELOG.md](CHANGELOG.md) for the complete release feature list and safety rules.
 
 ## Credits
 

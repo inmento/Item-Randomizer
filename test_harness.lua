@@ -47,10 +47,15 @@ local itemRecords = {
   RARE_CANDY = { price = 4800, tossable = true },
   BICYCLE = { keyItem = true, tossable = false },
   HM_01 = { machine = { kind = "HM", number = 1 }, tossable = false },
+  FLOWER_MAIL = { price = 50, tossable = true, isMail = true },
+  KINGS_ROCK = { price = 100, tossable = true },
 }
 
 local mod = {
   id = "item_randomizer",
+  find = function(_, id)
+    if id == "CRYSTAL_251" then return { exports={ dexSize=251 } } end
+  end,
   content = {
     maps = { each = function() return pairs(maps) end },
     field = { get = function(_, key) if key == "hiddenItems" then return hiddenItems end end },
@@ -77,7 +82,7 @@ local mod = {
 
 local entry = assert(loadfile("main.lua"))
 entry()(mod)
-assert(#callbacks.schema == 8, "shop randomization option was not defined")
+assert(#callbacks.schema == 10, "preview and PC diagnostic options were not defined")
 assert(callbacks.mapScripts.ROUTE_1
   and callbacks.mapScripts.ROUTE_1.talk.TEXT_ROUTE1_YOUNGSTER1,
   "Route 1 Potion gift was not registered")
@@ -107,11 +112,16 @@ callbacks.events["game.ready"]({ game = game })
 local mapping = store.item_mapping
 assert(mapping and mapping.version == 3 and mapping.placements, "v3 mapping was not stored")
 for _, itemId in pairs(mapping.placements) do
-  assert(itemId ~= "BICYCLE" and itemId ~= "HM_01", "unsafe key/HM item entered a generated placement")
+  assert(itemId ~= "BICYCLE" and itemId ~= "HM_01" and itemId ~= "FLOWER_MAIL"
+    and itemId ~= "KINGS_ROCK", "unsafe Crystal/key/HM item entered a generated placement")
 end
 assert(maps.VIRIDIAN_FOREST.objects[2].item == "BICYCLE", "key-item source was changed")
 assert(maps.VIRIDIAN_FOREST.objects[3].item == "HM_01", "HM source was changed")
 assert(next(save.pcItems) ~= nil, "New Game PC item was not initialized")
+
+-- Read-only diagnostics must not regenerate field or shop mappings.
+callbacks.events["mod.options_changed"]({ mod="item_randomizer", key="pc_reroll_status", value=true })
+callbacks.events["mod.options_changed"]({ mod="item_randomizer", key="shop_preview", value=true })
 
 save.money = 500
 callbacks.events["map.entered"]({ game = game, mapId = "VIRIDIAN_MART" })

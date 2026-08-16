@@ -1,7 +1,7 @@
 {
   "id": "item_randomizer",
   "name": "Item Randomizer",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "entry": "main.lua",
   "api": 2,
   "category": "GAMEPLAY",
@@ -10,5 +10,5 @@
   "affects_link": false,
   "github": "inmento/Item-Randomizer",
   "permissions": ["engine_internals"],
-  "description": "Safe item randomization for map pickups, hidden finds, shops, berries, gifts, eligible held items, and protected New Game PC choices in Gen 1 and Gold."
+  "description": "Safe item randomization for map pickups, hidden finds, shops, berries, gifts, eligible held items, and protected New Game PC choices in Gen 1 and Gold, with optional Crystal 251-safe dynamic item filtering."
 }
