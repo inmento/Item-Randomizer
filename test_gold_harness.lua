@@ -10,6 +10,7 @@ local options = {
   gold_berry_trees = true,
   gold_gift_items = true,
   gold_held_items = true,
+  gold_shop_items = true,
   gold_pc_item = true,
   pc_start_choice = "RANDOM",
   gold_reroll_pc = false,
@@ -18,10 +19,13 @@ local options = {
 love = { math = { random = function(n) return n end } }
 
 local items = {
-  POTION = { index = 18, pocket = "ITEM", canToss = true },
-  BERRY = { index = 173, pocket = "ITEM", canToss = true },
-  BERRY_JUICE = { index = 139, pocket = "ITEM", canToss = true },
-  GREAT_BALL = { index = 2, pocket = "ITEM", canToss = true },
+  POKE_BALL = { index = 4, price = 200, pocket = "ITEM", canToss = true },
+  POTION = { index = 18, price = 300, pocket = "ITEM", canToss = true },
+  BERRY = { index = 173, price = 20, pocket = "ITEM", canToss = true },
+  BERRY_JUICE = { index = 139, price = 100, pocket = "ITEM", canToss = true },
+  GREAT_BALL = { index = 2, price = 600, pocket = "ITEM", canToss = true },
+  SUPER_POTION = { index = 17, price = 700, pocket = "ITEM", canToss = true },
+  RARE_CANDY = { index = 20, price = 4800, pocket = "ITEM", canToss = true },
   BICYCLE = { index = 7, pocket = "KEY_ITEM", canToss = false },
   HM_01 = { index = 250, pocket = "TM_HM", canToss = false,
     machine = { kind = "HM" } },
@@ -38,7 +42,8 @@ local maps = {
 }
 
 local save = { pcItems = {}, inventory = {} }
-local game = { data = { gen2Maps = maps, items = items }, save = save }
+local marts = { lists = { { "POTION", "ANTIDOTE" } } }
+local game = { data = { gen2Maps = maps, items = items, gen2Marts = marts }, save = save }
 local mod = {
   id = "item_randomizer",
   game = game,
@@ -56,7 +61,7 @@ local mod = {
 }
 
 assert(loadfile("main.lua"))()(mod)
-assert(#callbacks.schema == 9, "current Gold option schema was not registered")
+assert(#callbacks.schema == 10, "Gold shop randomization option was not registered")
 callbacks.hooks["save.new_game"](function(value) return value end, save)
 callbacks.events["game.ready"]({ game = game })
 
@@ -69,6 +74,27 @@ assert(maps.ROUTE_29.objects[2].itemball.item == 7,
 assert(type(maps.ROUTE_29.bgEvents[1].hiddenItem.item) == "number",
   "Gold hidden item was not projected as a numeric item index")
 assert(next(save.pcItems) ~= nil, "Gold New Game PC item was not initialized")
+
+callbacks.hooks["script.command"](function(_, _, _, finalCmd)
+  return finalCmd
+end, { scriptKey = "CHERRYGROVE_MART" }, "pokemart", { 0, 0, 0 },
+  { martType = 0, mart = 0 })
+local shop = marts.lists[1]
+local shopState = mapping.shops and mapping.shops["standard:0"]
+assert(shopState and #shopState.stock == #shop and shop[1] == shopState.stock[1],
+  "Gold shop mapping was not persisted and projected")
+for _, itemId in ipairs(shop) do
+  assert(itemId ~= "BICYCLE" and itemId ~= "HM_01", "Gold shop contained an unsafe item")
+  assert(items[itemId] and items[itemId].price >= 1, "Gold shop price was not applied")
+end
+local firstStock = shop[1]
+callbacks.hooks["script.command"](function(_, _, _, finalCmd)
+  return finalCmd
+end, { scriptKey = "CHERRYGROVE_MART" }, "pokemart", { 0, 0, 0 },
+  { martType = 0, mart = 0 })
+assert(marts.lists[1][1] == firstStock, "Gold shop inventory was rerolled on revisit")
+callbacks.events["script.ended"]({ ctx = { game = game } })
+assert(items.POTION.price == 300, "Gold shared item price was not restored after the mart closed")
 
 local berryCommand
 callbacks.hooks["script.command"](function(_, _, args, cmd)

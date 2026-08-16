@@ -1,7 +1,7 @@
 # Changelog
 
-## 1.0.7 — Route 1 Story Gift
+## 1.0.8 — Shop Randomization
 
-This release adds the Gen 1 Route 1 Potion-sample reward to **RANDOMIZE STORY ITEM GIFTS**. The one-time `TEXT_ROUTE1_YOUNGSTER1` reward guarded by `EVENT_GOT_POTION_SAMPLE` is now assigned through the existing persistent, progression-weighted safe-item mapping rather than remaining outside the source catalog.
+This release adds optional persistent shop randomization for **Gen 1** and **Gold**. Each enabled shop receives a saved weighted inventory that remains stable through map changes, saves, reloads, and repeat visits. Item selection respects shop progression, avoids key items, HMs, non-tossable records, and low-value junk, while preserving a small chance of a stronger result.
 
-Key items, HMs, and other progression-sensitive records remain excluded. Disabling the option keeps the native Potion reward unchanged. The change is intentionally Gen 1-only: Gold retains its separate scripted-gift, berry-tree, trainer-held-item, and PC-item controls.
+Gen 1 adds **RANDOMIZE SHOP INVENTORIES**. Gold adds **GOLD RANDOMIZE SHOPS** for standard marts. Shop prices are generated with each saved shop layout and are applied only while the relevant mart is open. Existing map pickups, hidden finds, berries, gifts, trainer held items, and protected New Game PC behavior remain unchanged.

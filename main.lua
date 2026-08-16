@@ -20,6 +20,7 @@ return function(mod)
     local VERSION = 1
     local SOURCES, SOURCE_BY_KEY = nil, nil
     local baseline, baselineCaptured = {}, false
+    local mapping
 
     mod.options:define({
       { key = "gold_less_junk", label = "GOLD LESS JUNK", type = "toggle", default = true },
@@ -28,6 +29,7 @@ return function(mod)
       { key = "gold_berry_trees", label = "GOLD BERRY TREES", type = "toggle", default = false },
       { key = "gold_gift_items", label = "GOLD GIFT ITEMS", type = "toggle", default = false },
       { key = "gold_held_items", label = "GOLD HELD ITEMS", type = "toggle", default = false },
+      { key = "gold_shop_items", label = "GOLD RANDOMIZE SHOPS", type = "toggle", default = false },
       { key = "gold_pc_item", label = "GOLD START PC", type = "toggle", default = false },
       { key = "pc_start_choice", label = "GOLD PC ITEM", type = "choice", default = "RANDOM",
         choices = {
@@ -96,6 +98,124 @@ return function(mod)
       return pool[math.random(#pool)]
     end
 
+    local GOLD_SHOP_JUNK = {
+      ANTIDOTE = true, AWAKENING = true, BURN_HEAL = true, ICE_HEAL = true,
+      PARLYZ_HEAL = true, POKE_DOLL = true, REPEL = true, GUARD_SPEC = true,
+      X_ACCURACY = true, X_ATTACK = true, X_DEFEND = true, X_SPECIAL = true,
+      X_SPEED = true, FLOWER_MAIL = true, SURF_MAIL = true,
+    }
+    local goldShopPriceBaseline, goldShopPricesCaptured = {}, false
+
+    local function goldShopPool(game)
+      local pool = {}
+      for _, itemId in ipairs(safeItemPool(game)) do
+        if not GOLD_SHOP_JUNK[itemId] then pool[#pool + 1] = itemId end
+      end
+      return pool
+    end
+
+    local function goldShopTier(martId)
+      martId = math.max(0, math.floor(tonumber(martId) or 0))
+      if martId <= 3 then return 1 end
+      if martId <= 8 then return 2 end
+      if martId <= 15 then return 3 end
+      if martId <= 23 then return 4 end
+      return 5
+    end
+
+    local function goldShopWeight(game, itemId, tier)
+      local item = game and game.data and game.data.items and game.data.items[itemId] or {}
+      local price = math.max(1, tonumber(item and item.price) or 1)
+      local quality = price >= 5000 and 5 or price >= 2500 and 4
+        or price >= 1000 and 3 or price >= 400 and 2 or 1
+      local weight = ({
+        { 34, 13, 4, 1, 1 }, { 25, 16, 7, 2, 1 },
+        { 17, 16, 10, 4, 2 }, { 10, 14, 13, 7, 4 },
+        { 6, 10, 14, 11, 8 },
+      })[tier][quality] or 1
+      if mod.options:get("gold_less_junk") and GOLD_SHOP_JUNK[itemId] then return 0 end
+      return weight
+    end
+
+    local function weightedGoldShopItem(game, martId, pool, used)
+      local total, entries = 0, {}
+      local tier = goldShopTier(martId)
+      for _, itemId in ipairs(pool or {}) do
+        local weight = goldShopWeight(game, itemId, tier)
+        if weight > 0 and not (used and used[itemId]) then
+          total = total + weight
+          entries[#entries + 1] = { id = itemId, limit = total }
+        end
+      end
+      if total == 0 then return randomFrom(pool or {}) end
+      local roll = love and love.math and love.math.random and love.math.random(total)
+        or math.random(total)
+      for _, entry in ipairs(entries) do
+        if roll <= entry.limit then return entry.id end
+      end
+      return entries[#entries].id
+    end
+
+    local function goldMartTable(game)
+      return game and game.world and game.world.marts
+        or game and game.data and game.data.gen2Marts
+    end
+
+    local function goldShopMapping(game, current, martId, count)
+      current.shops = current.shops or {}
+      local key = "standard:" .. tostring(martId)
+      local stored = current.shops[key]
+      if type(stored) == "table" and type(stored.stock) == "table"
+        and #stored.stock == count then return stored end
+      local pool, stock, used = goldShopPool(game), {}, {}
+      for index = 1, count do
+        stock[index] = weightedGoldShopItem(game, martId, pool, used)
+        used[stock[index]] = true
+      end
+      stored = { stock = stock, prices = {} }
+      for index, itemId in ipairs(stock) do
+        local base = math.max(1, tonumber(game.data.items[itemId] and game.data.items[itemId].price) or 1)
+        local factor = 70 + (love and love.math and love.math.random and love.math.random(61) or math.random(61))
+        stored.prices[index] = math.max(1, math.floor(base * factor / 100))
+      end
+      current.shops[key] = stored
+      mod.save:set(STATE_KEY, current)
+      return stored
+    end
+
+    local function restoreGoldShopPrices(game)
+      if not goldShopPricesCaptured then return end
+      for itemId, price in pairs(goldShopPriceBaseline) do
+        local item = game and game.data and game.data.items and game.data.items[itemId]
+        if item then item.price = price end
+      end
+      goldShopPriceBaseline, goldShopPricesCaptured = {}, false
+    end
+
+    local function applyGoldShop(game, martId)
+      local marts = goldMartTable(game)
+      local lists = marts and (marts.lists or marts)
+      local original = lists and lists[(tonumber(martId) or 0) + 1]
+      if type(original) ~= "table" or #original == 0 then return false end
+      local current = mapping(game)
+      local shop = goldShopMapping(game, current, martId, #original)
+      local stock = {}
+      for index, itemId in ipairs(shop.stock) do
+        stock[index] = itemId
+        local item = game.data.items[itemId]
+        if item then
+          if not goldShopPricesCaptured then goldShopPricesCaptured = true end
+          if goldShopPriceBaseline[itemId] == nil then goldShopPriceBaseline[itemId] = item.price end
+          item.price = math.max(1, math.floor(tonumber(shop.prices[index]) or item.price or 1))
+        end
+      end
+      for index = #lists[(tonumber(martId) or 0) + 1], 1, -1 do
+        lists[(tonumber(martId) or 0) + 1][index] = nil
+      end
+      for index, itemId in ipairs(stock) do lists[(tonumber(martId) or 0) + 1][index] = itemId end
+      return true
+    end
+
     local function buildSources(game)
       if SOURCES then return SOURCES end
       local out = {}
@@ -127,15 +247,22 @@ return function(mod)
       return out
     end
 
-    local function mapping(game)
+    mapping = function(game)
       buildSources(game)
       local current = mod.save:get(STATE_KEY)
       if type(current) == "table" and current.version == VERSION
         and type(current.placements) == "table" then
+        -- Shop state was added after the original Gold mapping schema. Add it
+        -- lazily so established field, berry, gift, held-item, and PC results
+        -- remain untouched on existing saves.
+        if type(current.shops) ~= "table" then
+          current.shops = {}
+          mod.save:set(STATE_KEY, current)
+        end
         return current
       end
       local pool = safeItemPool(game)
-      current = { version = VERSION, placements = {}, fruitTrees = {}, gifts = {}, held = {}, pcPlaced = false, pcLocked = false }
+      current = { version = VERSION, placements = {}, fruitTrees = {}, gifts = {}, held = {}, shops = {}, pcPlaced = false, pcLocked = false }
       for _, source in ipairs(SOURCES) do
         current.placements[source.key] = randomFrom(pool)
       end
@@ -314,11 +441,21 @@ return function(mod)
       if changed ~= mod.id then return end
       if event.key == "gold_reroll_pc" and event.value then rerollPc(mod.game) end
       if event.key == "gold_ball_items" or event.key == "gold_finder_items" then applyMapSources(mod.game) end
+      if event.key == "gold_shop_items" and event.value ~= true then restoreGoldShopPrices(mod.game) end
+    end)
+    mod.events:on("script.ended", function(event)
+      restoreGoldShopPrices((event and event.ctx and event.ctx.game) or mod.game)
     end)
 
     mod.hooks:wrap("script.command", function(next, ctx, name, args, cmd)
       if not isGen2() then return next(ctx, name, args, cmd) end
       local game, current = mod.game, mapping(mod.game)
+      if name == "pokemart" and mod.options:get("gold_shop_items") and cmd then
+        local martType = cmd.martType or cmd.dialog or (args and args[1]) or 0
+        local martId = cmd.mart or cmd.martId
+        if martId == nil and args then martId = (args[2] or 0) + (args[3] or 0) * 0x100 end
+        if martType == 0 or martType == "STANDARD" then applyGoldShop(game, martId or 0) end
+      end
       if name == "fruittree" and mod.options:get("gold_berry_trees") and ctx and ctx.scriptKey then
         local rewritten = {}
         for key, value in pairs(cmd or {}) do rewritten[key] = value end
@@ -430,6 +567,12 @@ return function(mod)
       label = "RANDOMIZE STORY ITEM GIFTS",
       type = "toggle",
       default = true,
+    },
+    {
+      key = "randomize_shops",
+      label = "RANDOMIZE SHOP INVENTORIES",
+      type = "toggle",
+      default = false,
     },
     {
       key = "starting_pc_item",
@@ -652,6 +795,152 @@ return function(mod)
     return SAFE_ITEMS[love.math.random(#SAFE_ITEMS)]
   end
 
+  local ensureMapping
+  local SHOP_EXCLUDED = {
+    ANTIDOTE = true, AWAKENING = true, BURN_HEAL = true, BRN_HEAL = true,
+    ICE_HEAL = true, PARLYZ_HEAL = true, POKE_DOLL = true, REPEL = true,
+    GUARD_SPEC = true, X_ACCURACY = true, X_ATTACK = true, X_DEFEND = true,
+    X_SPEED = true, X_SPECIAL = true,
+  }
+  local shopPriceBaseline, shopPricesCaptured = {}, false
+  local shopBaselines, shopBaselinesCaptured = {}, false
+
+  local function randomInt(maximum)
+    if maximum <= 1 then return 1 end
+    if love and love.math and love.math.random then return love.math.random(maximum) end
+    return math.random(maximum)
+  end
+
+  local function copyArray(rows)
+    local out = {}
+    for index, value in ipairs(rows or {}) do out[index] = value end
+    return out
+  end
+
+  local function shopTable(game)
+    return game and game.data and (game.data.text_pointers or game.data.textPointers) or {}
+  end
+
+  local function captureShopBaselines(game)
+    if shopBaselinesCaptured then return end
+    for mapId, entries in pairs(shopTable(game)) do
+      for textConst, entry in pairs(entries or {}) do
+        if type(entry) == "table" and type(entry.mart) == "table" and #entry.mart > 0 then
+          shopBaselines[mapId .. ":" .. textConst] = copyArray(entry.mart)
+        end
+      end
+    end
+    shopBaselinesCaptured = true
+  end
+
+  local function shopSource(mapId)
+    return { kind = "shop", mapId = mapId or "" }
+  end
+
+  local function chooseShopItem(source, options, used)
+    local candidate
+    for _ = 1, 48 do
+      candidate = itemForSource(source, options)
+      if candidate and not SHOP_EXCLUDED[candidate] and not used[candidate] then return candidate end
+    end
+    for _, itemId in ipairs(SAFE_ITEMS) do
+      if not SHOP_EXCLUDED[itemId] and not used[itemId] then return itemId end
+    end
+    return candidate
+  end
+
+  local function shopPrice(itemId)
+    local base = math.max(1, tonumber(ITEM_INFO[itemId] and ITEM_INFO[itemId].price) or 1)
+    return math.max(1, math.floor(base * (70 + randomInt(61) - 1) / 100))
+  end
+
+  local function shopRecord(mapping, mapId, textConst, original)
+    mapping.shops = mapping.shops or { gen1 = {} }
+    mapping.shops.gen1 = mapping.shops.gen1 or {}
+    local key = tostring(mapId) .. ":" .. tostring(textConst)
+    local record = mapping.shops.gen1[key]
+    if type(record) == "table" and type(record.stock) == "table"
+      and #record.stock == #original and type(record.prices) == "table" then
+      return record
+    end
+    local options, used = mapping.options, {}
+    record = { stock = {}, prices = {}, firstShop = mapId == "VIRIDIAN_MART" }
+    for index = 1, #original do
+      local itemId
+      if record.firstShop and index == 1 and not used.POKE_BALL and not isUnsafeProgressionItem("POKE_BALL") then
+        itemId = "POKE_BALL"
+      else
+        itemId = chooseShopItem(shopSource(mapId), options, used)
+      end
+      used[itemId] = true
+      record.stock[index] = itemId
+      record.prices[index] = shopPrice(itemId)
+    end
+    mapping.shops.gen1[key] = record
+    mod.save:set(MOD_STATE_KEY, mapping)
+    return record
+  end
+
+  local function restoreShopPrices(game)
+    if not shopPricesCaptured then return end
+    for itemId, price in pairs(shopPriceBaseline) do
+      local item = game and game.data and game.data.items and game.data.items[itemId]
+      if item then item.price = price end
+    end
+    shopPriceBaseline, shopPricesCaptured = {}, false
+  end
+
+  local function affordableBallPrice(game, record)
+    local money = math.max(0, math.floor(tonumber(game and game.save and game.save.money) or 0))
+    if money == 0 then
+      record.ballPrice = 0
+      return 0
+    end
+    local previous, price = record.ballPrice, money
+    for _ = 1, 16 do
+      price = randomInt(money + 1) - 1
+      if price ~= previous then break end
+    end
+    record.ballPrice = price
+    return price
+  end
+
+  local function applyGen1Shop(game, mapId, textConst, entry)
+    if not (game and entry and type(entry.mart) == "table") then return false end
+    captureShopBaselines(game)
+    local original = shopBaselines[tostring(mapId) .. ":" .. tostring(textConst)]
+    if type(original) ~= "table" or #original == 0 then return false end
+    local mapping = ensureMapping()
+    local record = shopRecord(mapping, mapId, textConst, original)
+    restoreShopPrices(game)
+    for index = #entry.mart, 1, -1 do entry.mart[index] = nil end
+    for index, itemId in ipairs(record.stock) do
+      entry.mart[index] = itemId
+      local item = game.data.items and game.data.items[itemId]
+      if item then
+        shopPricesCaptured = true
+        if shopPriceBaseline[itemId] == nil then shopPriceBaseline[itemId] = item.price end
+        local price = record.prices[index]
+        if record.firstShop and index == 1 and itemId == "POKE_BALL" then
+          price = affordableBallPrice(game, record)
+          mod.save:set(MOD_STATE_KEY, mapping)
+        end
+        item.price = math.max(0, math.floor(tonumber(price) or item.price or 1))
+      end
+    end
+    return true
+  end
+
+  local function applyGen1MapShops(game, mapId)
+    if not mod.options:get("randomize_shops") then return end
+    local entries = shopTable(game)[mapId]
+    for textConst, entry in pairs(entries or {}) do
+      if type(entry) == "table" and type(entry.mart) == "table" then
+        applyGen1Shop(game, mapId, textConst, entry)
+      end
+    end
+  end
+
   local function makeMapping(options)
     local selected = selectedSources(options)
     local placements = {}
@@ -676,6 +965,7 @@ return function(mod)
       pcRerolls = 0,
       pcRerollLocked = false,
       gifts = {},
+      shops = { gen1 = {} },
     }
   end
 
@@ -695,10 +985,21 @@ return function(mod)
     return true
   end
 
-  local function ensureMapping()
+  ensureMapping = function()
     local currentOptions = optionSnapshot()
     local mapping = mod.save:get(MOD_STATE_KEY)
     if validMapping(mapping) then
+      -- Shop layouts are generated lazily on each save’s first enabled mart
+      -- visit. Keeping them outside the field-item option snapshot lets a
+      -- player enable the new shop option without disturbing an established
+      -- item-ball, hidden-item, gift, or PC mapping.
+      if type(mapping.shops) ~= "table" then
+        mapping.shops = { gen1 = {} }
+        mod.save:set(MOD_STATE_KEY, mapping)
+      elseif type(mapping.shops.gen1) ~= "table" then
+        mapping.shops.gen1 = {}
+        mod.save:set(MOD_STATE_KEY, mapping)
+      end
       if not sameOptions(mapping.options, currentOptions) then
         mod.log:warn("Item Randomizer settings changed after this save's mapping was created; keeping the saved mapping")
       end
@@ -1011,12 +1312,37 @@ return function(mod)
   mod.events:on("save.loaded", function(event)
     activateCurrentSave(event.game or mod.game)
   end)
+  mod.events:on("map.entered", function(event)
+    local game = rememberActiveGame((event and event.game) or mod.game)
+    applyGen1MapShops(game, event and event.mapId)
+  end)
+
+  -- Generic mart clerks open the current map’s text-pointer stock directly;
+  -- scripted marts route through this command. Cover both paths so every Gen 1
+  -- shelf receives the same persistent saved layout.
+  mod.hooks:wrap("script.command", function(next, ctx, name, args, cmd)
+    if name == "open_mart" and mod.options:get("randomize_shops") then
+      local game = rememberActiveGame(ctx and ctx.game or mod.game)
+      local overworld = ctx and ctx.overworld
+      local map = overworld and overworld.map
+      local mapId = map and map.def and map.def.label
+      local textConst = args and args[1]
+      local entry = game and game.data and type(game.data.textEntry) == "function"
+        and game.data:textEntry(mapId, textConst)
+        or (shopTable(game)[mapId] and shopTable(game)[mapId][textConst])
+      applyGen1Shop(game, mapId, textConst, entry)
+    end
+    return next(ctx, name, args, cmd)
+  end)
 
   mod.events:on("mod.options_changed", function(event)
     -- ManagerState emits `mod` as an ID string; accept an object for forward
     -- compatibility with other event producers.
     local changedModId = type(event.mod) == "table" and event.mod.id or event.mod
     if changedModId ~= mod.id then return end
+    if event.key == "randomize_shops" and event.value ~= true then
+      restoreShopPrices(liveGame())
+    end
     if event.key == "reroll_pc_item" and event.value then
       -- Keep the manager event side-effect free. The first proven working
       -- build performed only the reroll here; writing option state or popping
