@@ -6,7 +6,7 @@ Item Randomizer creates a persistent per-save item mapping for Gen 1 and Gold. I
 
 ## Install
 
-Import the `item_randomizer-1.0.9.zip` release archive through Gen 1 Recomp’s **Import mod .zip** action. The archive extracts directly to an `item_randomizer/` folder containing `manifest.json` and `main.lua`.
+Import the `item_randomizer-1.0.10.zip` release archive through Gen 1 Recomp’s **Import mod .zip** action. The archive extracts directly to an `item_randomizer/` folder containing `manifest.json` and `main.lua`.
 
 ## Features
 

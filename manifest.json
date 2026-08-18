@@ -1,9 +1,10 @@
 {
   "id": "item_randomizer",
   "name": "Item Randomizer",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "entry": "main.lua",
   "api": 2,
+  "game_version": ">=0.1.99",
   "category": "GAMEPLAY",
   "profile": "content",
   "games": ["gen1", "gen2"],
