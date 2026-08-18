@@ -49,6 +49,7 @@ local itemRecords = {
   HM_01 = { machine = { kind = "HM", number = 1 }, tossable = false },
   FLOWER_MAIL = { price = 50, tossable = true, isMail = true },
   KINGS_ROCK = { price = 100, tossable = true },
+  WONDER_GUARD = { price = 0, tossable = false },
 }
 
 local mod = {
@@ -113,7 +114,8 @@ local mapping = store.item_mapping
 assert(mapping and mapping.version == 3 and mapping.placements, "v3 mapping was not stored")
 for _, itemId in pairs(mapping.placements) do
   assert(itemId ~= "BICYCLE" and itemId ~= "HM_01" and itemId ~= "FLOWER_MAIL"
-    and itemId ~= "KINGS_ROCK", "unsafe Crystal/key/HM item entered a generated placement")
+    and itemId ~= "KINGS_ROCK" and itemId ~= "WONDER_GUARD",
+    "unsafe Crystal/key/HM/Wonder Guard item entered a generated placement")
 end
 assert(maps.VIRIDIAN_FOREST.objects[2].item == "BICYCLE", "key-item source was changed")
 assert(maps.VIRIDIAN_FOREST.objects[3].item == "HM_01", "HM source was changed")

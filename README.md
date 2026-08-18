@@ -6,7 +6,7 @@ Item Randomizer creates a persistent per-save item mapping for Gen 1 and Gold. I
 
 ## Install
 
-Import the `item_randomizer-1.0.10.zip` release archive through Gen 1 Recomp’s **Import mod .zip** action. The archive extracts directly to an `item_randomizer/` folder containing `manifest.json` and `main.lua`.
+Import the current `item_randomizer-<version>.zip` release archive through Gen 1 Recomp’s **Import mod .zip** action. The archive extracts directly to an `item_randomizer/` folder containing `manifest.json` and `main.lua`.
 
 ## Features
 
@@ -28,7 +28,7 @@ Berry-tree handling preserves apricorn trees. Held-item handling affects only Po
 
 Item Randomizer targets Mod API 2 and supports Gen 1 and Gold. It reads the engine’s active GameVersion before registering generation-specific behavior, keeping the Gen 1 and Gold option sets separate. It can be used alongside Gym Leader Shuffle and Starter Picker.
 
-**Crystal 251 is optional.** When that Red, Blue, or Yellow overhaul is active, Item Randomizer uses its merged live item registry and excludes Crystal mail, machines, HMs, key/non-tossable items, and Crystal single-player evolution/progression items from generated pools. It does not require Crystal 251 and does not modify Crystal’s item effects, progression, maps, or shops outside its enabled randomized projections. See [CHANGELOG.md](CHANGELOG.md) for the complete release feature list and safety rules.
+**Merged content providers are optional.** Item Randomizer refreshes its source and safe-item views from the live merged registry whenever the game becomes ready. Crystal 251, Gen 1 Shedinja, and other compatible content providers therefore remain optional: the mod can use safe merged records without overwriting their authored data. Key items, mail, machines, HMs, non-tossable items, and Crystal single-player evolution/progression items remain excluded. In particular, Shedinja’s non-tossable `WONDER GUARD` token cannot enter random item pools. The mod does not require an expansion provider and does not modify its item effects, progression, maps, or shops outside enabled randomized projections. See [CHANGELOG.md](CHANGELOG.md) for the complete release feature list and safety rules.
 
 ## Credits
 

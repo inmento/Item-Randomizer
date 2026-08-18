@@ -1490,8 +1490,12 @@ return function(mod)
   end
 
   mod.events:on("game.ready", function(event)
+    -- Other content mods may register safe items or map sources after this mod
+    -- has initialized. Rebuild from the effective merged registry before
+    -- applying the current save mapping; authored foreign item records remain
+    -- untouched and the existing safety filter still excludes progression data.
+    rebuildContentViews()
     if crystal251Active() then
-      rebuildContentViews()
       mod.log:info("Item Randomizer: Crystal 251 detected; filtering imported mail, machines, and progression items")
     end
     activateCurrentSave(event.game)
