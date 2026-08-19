@@ -1,7 +1,7 @@
 {
   "id": "item_randomizer",
   "name": "Item Randomizer",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "entry": "main.lua",
   "api": 2,
   "game_version": ">=0.1.99",

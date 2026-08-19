@@ -38,13 +38,13 @@ return function(mod)
       { key = "gold_berry_trees", label = "GOLD BERRY TREES", type = "toggle", default = false },
       { key = "gold_gift_items", label = "GOLD GIFT ITEMS", type = "toggle", default = false },
       { key = "gold_held_items", label = "GOLD HELD ITEMS", type = "toggle", default = false },
-      { key = "gold_held_item_mode", label = "GOLD HELD ITEM MODE", type = "choice", default = "SAFE_ANY",
+      { key = "gold_held_item_mode", label = "GOLD HOLD MODE", type = "choice", default = "SAFE_ANY",
         choices = {
           { "SAFE HELD ITEMS", "SAFE_ANY" },
           { "USEFUL HELD ITEMS", "USEFUL" },
           { "NO HELD ITEMS", "NONE" },
         } },
-      { key = "gold_shop_items", label = "GOLD RANDOMIZE SHOPS", type = "toggle", default = false },
+      { key = "gold_shop_items", label = "GOLD SHOPS", type = "toggle", default = false },
       { key = "gold_pc_item", label = "GOLD START PC", type = "toggle", default = false },
       { key = "pc_start_choice", label = "GOLD PC ITEM", type = "choice", default = "RANDOM",
         choices = {
@@ -59,7 +59,7 @@ return function(mod)
         } },
       { key = "gold_reroll_pc", label = "GOLD REROLL PC", type = "toggle", default = false },
       { key = "gold_shop_preview", label = "GOLD SHOP PREVIEW", type = "toggle", default = false },
-      { key = "gold_pc_status", label = "GOLD PC REROLL STATUS", type = "toggle", default = false },
+      { key = "gold_pc_status", label = "GOLD PC STATUS", type = "toggle", default = false },
     })
 
     local function mapsOf(game)
@@ -636,49 +636,49 @@ return function(mod)
   mod.options:define({
     {
       key = "lesser_bad_items",
-      label = "REDUCE LOW-VALUE ITEMS",
+      label = "LESS JUNK",
       type = "toggle",
       default = true,
     },
     {
       key = "progression_weighted_loot",
-      label = "PROGRESSION-WEIGHTED LOOT",
+      label = "PROGRESS LOOT",
       type = "toggle",
       default = true,
     },
     {
       key = "overworld_items",
-      label = "RANDOMIZE OVERWORLD BALLS",
+      label = "SHUFFLE BALLS",
       type = "toggle",
       default = true,
     },
     {
       key = "itemfinder_items",
-      label = "RANDOMIZE ITEMFINDER ITEMS",
+      label = "SHUFFLE FINDER",
       type = "toggle",
       default = true,
     },
     {
       key = "gift_items",
-      label = "RANDOMIZE STORY ITEM GIFTS",
+      label = "SHUFFLE GIFTS",
       type = "toggle",
       default = true,
     },
     {
       key = "randomize_shops",
-      label = "RANDOMIZE SHOP INVENTORIES",
+      label = "SHUFFLE SHOPS",
       type = "toggle",
       default = false,
     },
     {
       key = "starting_pc_item",
-      label = "RANDOMIZE NEW GAME PC",
+      label = "NEW GAME PC",
       type = "toggle",
       default = true,
     },
     {
       key = "reroll_pc_item",
-      label = "REROLL NEW GAME PC ITEM",
+      label = "REROLL PC ITEM",
       type = "toggle",
       default = false,
     },
