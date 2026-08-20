@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.13 — Silver support
+
+Item Randomizer now recognizes **Pokémon Silver** as Generation 2 and runs the same established Gen 2 item, mart, berry-tree, gift, held-item, and New Game PC randomization path as Gold. Silver no longer incorrectly loads the Gen 1 item-randomization implementation.
+
+This is a direct root-cause correction using Gen1Recomp’s shared `GameVersion.generation()` contract rather than a separate Silver mapping. The existing Gen 1 and Gold harnesses, plus a focused Silver Gen 2 routing harness, pass.
+
 ## 1.0.12 — Compact option labels
 
 Every Gen 1 and Gold settings label now fits the fixed 17-column mod-settings viewport. The names were shortened for display only; item pools, progression weighting, shops, PC choices and rerolls, berries, gifts, held items, and safety filters are unchanged.

@@ -1,6 +1,9 @@
 local callbacks = { events = {}, hooks = {} }
 package.preload["src.core.GameVersion"] = function()
-  return { get = function() return "red" end }
+  return {
+    get = function() return "red" end,
+    generation = function(id) return (id == "gold" or id == "silver") and 2 or 1 end,
+  }
 end
 package.preload["src.render.TextBox"] = function()
   return { new = function(_, _, _, done) return { done = done } end }
