@@ -2,7 +2,7 @@
 
 > **AI assisted; not AI created.**
 
-Item Randomizer creates a persistent per-save item mapping for Gen 1, Gold, and Silver. It supports independent source categories, progression-conscious item weighting, and safeguards that keep key items, HMs, non-tossable items, and other progression-sensitive rewards outside ordinary item pools.
+Item Randomizer creates a persistent per-save item mapping for Gen 1, Gold, Silver, and Crystal. It supports independent source categories, progression-conscious item weighting, and safeguards that keep key items, HMs, non-tossable items, and other progression-sensitive rewards outside ordinary item pools.
 
 ## Install
 
@@ -18,17 +18,19 @@ Visible item balls, hidden Itemfinder rewards, and the optional New Game PC item
 
 In **Gen 1**, the New Game PC feature replaces only the generated starting PC item. If a fresh save still has its untouched native Potion or an empty PC after startup, the mod retries that placement without changing an established PC. **REROLL NEW GAME PC ITEM** is a one-shot action: it starts OFF, rerolls the generated item when enabled, immediately returns to OFF, and closes **Mods** and the Start menu back to the overworld. It permanently locks only if the player later tries to reroll after the initialized generated contents have left the PC. **PC REROLL STATUS** is a read-only display of the stored PC state, including fresh, ready, unavailable, and permanently locked conditions. Gen 1 does not show the manual PC-item selector; that selector is Gen 2-only.
 
-## Gold and Silver
+## Gen 2: Gold, Silver, and Crystal
 
-Gold and Silver add native support for visible item balls, hidden item records, berry trees, eligible ordinary scripted gifts, eligible existing held items, and the protected New Game PC reroll. When **GOLD START PC** is enabled, **GOLD PC ITEM** can choose a random one-item result, five Great Balls, Rare Candies, Potions, Antidotes, Escape Ropes, a basic five-item mix, or no item.
+Gold, Silver, and Crystal add native support for visible item balls, hidden item records, berry trees, eligible ordinary scripted gifts, eligible existing held items, and the protected New Game PC reroll. When **GEN2 PC** is enabled, **GEN2 PC IT** can choose a random one-item result, five Great Balls, Rare Candies, Potions, Antidotes, Escape Ropes, a basic five-item mix, or no item.
 
-Berry-tree handling preserves apricorn trees. Held-item handling affects only Pokémon that originally held an item; it does not assign an item to an itemless Pokémon. **GOLD HELD ITEM MODE** can use all safe effective held items, a more useful subset, or no randomized held items. Scripted gifts use the same safe item rules as other enabled sources. **GOLD RANDOMIZE SHOPS** adds the corresponding persistent, progression-conscious randomization for standard Gold and Silver marts. **GOLD SHOP PREVIEW** and **GOLD PC REROLL STATUS** provide read-only testing views of saved generated state.
+Berry-tree handling preserves apricorn trees. Held-item handling affects only Pokémon that originally held an item; it does not assign an item to an itemless Pokémon. **GEN2 HOLD** can use all safe effective held items, a more useful subset, or no randomized held items. Scripted gifts use the same safe item rules as other enabled sources. **GEN2 SHOPS** adds the corresponding persistent, progression-conscious randomization for standard Gen 2 marts. **GEN2 SHOP** and **G2 PC INFO** provide read-only testing views of saved generated state.
+
+The compact settings labels now say `GEN2` or `G2` so Crystal is not presented as a Gold-only mode. The underlying `gold_*` option keys and `gold_item_mapping` save record remain intentionally unchanged, preserving established Gold and Silver randomized saves.
 
 ## Compatibility
 
-Item Randomizer targets Mod API 2 and supports Gen 1, Gold, and Silver. It reads the engine’s active GameVersion generation contract before registering generation-specific behavior, keeping the Gen 1 and Gen 2 option sets separate. It can be used alongside Gym Leader Shuffle and Starter Picker.
+Item Randomizer targets Mod API 2 and supports Gen 1, Gold, Silver, and Crystal on Gen1Recomp `0.2.24` or later. It reads the engine’s active GameVersion generation contract before registering generation-specific behavior, keeping the Gen 1 and Gen 2 option sets separate. It can be used alongside Gym Leader Shuffle and Starter Picker.
 
-**Merged content providers are optional.** Item Randomizer refreshes its source and safe-item views from the live merged registry whenever the game becomes ready. Crystal 251, Gen 1 Shedinja, and other compatible content providers therefore remain optional: the mod can use safe merged records without overwriting their authored data. Key items, mail, machines, HMs, non-tossable items, and Crystal single-player evolution/progression items remain excluded. In particular, Shedinja’s non-tossable `WONDER GUARD` token cannot enter random item pools. The mod does not require an expansion provider and does not modify its item effects, progression, maps, or shops outside enabled randomized projections. See [CHANGELOG.md](CHANGELOG.md) for the complete release feature list and safety rules.
+**Merged content providers are optional.** Item Randomizer refreshes its source and safe-item views from the live merged registry whenever the game becomes ready. Crystal 251, Gen 1 Shedinja, and other compatible content providers therefore remain optional: the mod can use safe merged records without overwriting their authored data. Key items, mail, machines, HMs, non-tossable items, and Crystal single-player evolution/progression items remain excluded. The Crystal regression verifies safe dynamic discovery for the standard Gen 2 `gen2Maps` item-ball, hidden-item, and Mart shapes; it does not claim untested coverage for every Crystal story-specific scripted reward. In particular, Shedinja’s non-tossable `WONDER GUARD` token cannot enter random item pools. The mod does not require an expansion provider and does not modify its item effects, progression, maps, or shops outside enabled randomized projections. See [CHANGELOG.md](CHANGELOG.md) for the complete release feature list and safety rules.
 
 ## Credits
 

@@ -32,21 +32,21 @@ return function(mod)
     local mapping
 
     mod.options:define({
-      { key = "gold_less_junk", label = "GOLD LESS JUNK", type = "toggle", default = true },
-      { key = "gold_ball_items", label = "GOLD BALL ITEMS", type = "toggle", default = false },
-      { key = "gold_finder_items", label = "GOLD FINDER ITEMS", type = "toggle", default = false },
-      { key = "gold_berry_trees", label = "GOLD BERRY TREES", type = "toggle", default = false },
-      { key = "gold_gift_items", label = "GOLD GIFT ITEMS", type = "toggle", default = false },
-      { key = "gold_held_items", label = "GOLD HELD ITEMS", type = "toggle", default = false },
-      { key = "gold_held_item_mode", label = "GOLD HOLD MODE", type = "choice", default = "SAFE_ANY",
+      { key = "gold_less_junk", label = "GEN2 LESS", type = "toggle", default = true },
+      { key = "gold_ball_items", label = "GEN2 BALLS", type = "toggle", default = false },
+      { key = "gold_finder_items", label = "GEN2 FIND", type = "toggle", default = false },
+      { key = "gold_berry_trees", label = "GEN2 BERRY", type = "toggle", default = false },
+      { key = "gold_gift_items", label = "GEN2 GIFTS", type = "toggle", default = false },
+      { key = "gold_held_items", label = "GEN2 HELD", type = "toggle", default = false },
+      { key = "gold_held_item_mode", label = "GEN2 HOLD", type = "choice", default = "SAFE_ANY",
         choices = {
           { "SAFE HELD ITEMS", "SAFE_ANY" },
           { "USEFUL HELD ITEMS", "USEFUL" },
           { "NO HELD ITEMS", "NONE" },
         } },
-      { key = "gold_shop_items", label = "GOLD SHOPS", type = "toggle", default = false },
-      { key = "gold_pc_item", label = "GOLD START PC", type = "toggle", default = false },
-      { key = "pc_start_choice", label = "GOLD PC ITEM", type = "choice", default = "RANDOM",
+      { key = "gold_shop_items", label = "GEN2 SHOPS", type = "toggle", default = false },
+      { key = "gold_pc_item", label = "GEN2 PC", type = "toggle", default = false },
+      { key = "pc_start_choice", label = "GEN2 PC IT", type = "choice", default = "RANDOM",
         choices = {
           { "RANDOM (1 ITEM)", "RANDOM" },
           { "5 GREAT BALLS", "GREAT_BALL" },
@@ -57,9 +57,9 @@ return function(mod)
           { "5 BASIC ITEMS", "BASIC" },
           { "NO ITEM", "NONE" },
         } },
-      { key = "gold_reroll_pc", label = "GOLD REROLL PC", type = "toggle", default = false },
-      { key = "gold_shop_preview", label = "GOLD SHOP PREVIEW", type = "toggle", default = false },
-      { key = "gold_pc_status", label = "GOLD PC STATUS", type = "toggle", default = false },
+      { key = "gold_reroll_pc", label = "G2 REROLL", type = "toggle", default = false },
+      { key = "gold_shop_preview", label = "GEN2 SHOP", type = "toggle", default = false },
+      { key = "gold_pc_status", label = "G2 PC INFO", type = "toggle", default = false },
     })
 
     local function mapsOf(game)

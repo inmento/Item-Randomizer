@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.0 — Native Crystal support
+
+Item Randomizer now supports **Pokémon Crystal** on Gen1Recomp `0.2.24` and later through its existing generation-wide Gen 2 route. The Crystal regression uses the concrete `crystal` identifier and verifies dynamic `gen2Maps` discovery for visible item balls, hidden items, and standard Mart data without changing the established Gold or Silver paths.
+
+All player-facing Gen 2 settings now use compact `GEN2` or `G2` labels instead of Gold-only wording. Persisted `gold_*` option keys and the `gold_item_mapping` save record are deliberately unchanged, so existing Gold and Silver randomized saves keep their settings and mappings. The release does not claim untested Crystal story-specific gift or fruit-tree behavior; the existing source safety filters remain active and no Crystal ROM data or assets are bundled.
+
 ## 1.0.13 — Silver support
 
 Item Randomizer now recognizes **Pokémon Silver** as Generation 2 and runs the same established Gen 2 item, mart, berry-tree, gift, held-item, and New Game PC randomization path as Gold. Silver no longer incorrectly loads the Gen 1 item-randomization implementation.
