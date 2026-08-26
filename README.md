@@ -35,3 +35,7 @@ Item Randomizer targets Mod API 2 and supports Gen 1, Gold, Silver, and Crystal 
 ## Credits
 
 Thanks to [Wes Kestis](https://github.com/weskestis), creator of the [RBY Randomizer — Kanto Ascendent Compatible](https://github.com/weskestis/RBY-Randomizer-Kanto-Ascendent-Compatible), for granting permission to review the Randomizer and build compatible behavior.
+
+## License
+
+Unless a file or third-party notice says otherwise, this repository's original source code, configuration, tests, and documentation are licensed under the [MIT License](LICENSE). Read [LICENSE_SCOPE.md](LICENSE_SCOPE.md) for attribution guidance and third-party, asset, user-supplied-source, and game-IP boundaries.
